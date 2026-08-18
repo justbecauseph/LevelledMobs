@@ -9,7 +9,7 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | Chunk | Title | Status | Progress | Key Deliverables |
 |---|---|---|---|---|
 | **Chunk 0** | Pre-Port Audit & Feature Matrix | **DONE** | 100% | `FEATURE_MATRIX.md`, `BUKKIT_DEPENDENCIES.md`, `PORT_STATUS.md` |
-| **Chunk 1** | Fabric Skeleton & Vertical Slice MVP | **NOT STARTED** | 0% | `LevelledMobsModule`, `LevelledMobData`, NBT Mixin, `/lm inspect` |
+| **Chunk 1** | Fabric Skeleton & Vertical Slice MVP | **DONE** | 100% | `LevelledMobsModule`, `LevelledMobData`, NBT Mixin, `/lm inspect` |
 | **Chunk 2** | Context Abstractions & Rule Engine Core | **NOT STARTED** | 0% | `MobContext`, `LevelRule`, `RuleParser`, `RuleManager` |
 | **Chunk 3** | Levelling Strategy Subsystem | **NOT STARTED** | 0% | Random, Distance, Y, Player, Custom strategies |
 | **Chunk 4** | Attribute Scaling Engine & Combat Pipeline | **NOT STARTED** | 0% | 8 attributes, idempotent modifiers, `HealthPolicy` |
@@ -32,14 +32,14 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] Initial `PORT_STATUS.md` created.
 
 ### Chunk 1 — Fabric Module Skeleton & Vertical Slice MVP
-- [ ] Fabric module skeleton initialized in `lampas.levelledmobs`.
-- [ ] `LevelledMobData` record and `LevelledMobHolder` duck interface created.
-- [ ] Mixin into `LivingEntity.writeCustomDataToNbt` and `readCustomDataFromNbt`.
-- [ ] Minimal spawn intercept assigning level 1–10 to vanilla hostiles.
-- [ ] Attribute modifier application for Max Health and Attack Damage.
-- [ ] Server-side nametag display (`Lv. X Mob`).
-- [ ] Brigadier `/lm inspect` command.
-- [ ] Project compiles with no Bukkit/Paper dependencies.
+- [x] Fabric module skeleton initialized in `lampas.levelledmobs`.
+- [x] `LevelledMobData` record and `LevelledMobHolder` duck interface created.
+- [x] Mixin into `LivingEntity.writeCustomDataToNbt` and `readCustomDataFromNbt`.
+- [x] Minimal spawn intercept assigning level 1–10 to vanilla hostiles.
+- [x] Attribute modifier application for Max Health and Attack Damage.
+- [x] Server-side nametag display (`Lv. X Mob`).
+- [x] Brigadier `/lm inspect` command.
+- [x] Project compiles with no Bukkit/Paper dependencies.
 
 ### Chunk 2 — Context Abstractions & Rule Engine Core
 - [ ] `MobContext`, `PlayerContext`, `SpawnContext`, `WorldContext` interfaces.
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 0 (Pre-Port Audit & Feature Matrix).
-- **Next Target**: Chunk 1 (Fabric Module Skeleton & Vertical Slice MVP).
+- **Active Task**: Completed Chunk 1 (Fabric Module Skeleton & Vertical Slice MVP).
+- **Next Target**: Chunk 2 (Context Abstractions & Rule Engine Core).

@@ -14,7 +14,9 @@ dependencies{
 
 
 subprojects {
-    plugins.apply("org.jetbrains.dokka")
+    if (name != "levelledmobs-fabric") {
+        plugins.apply("org.jetbrains.dokka")
+    }
 }
 
 val javadocJar = tasks.register<Jar>("javadocJar") {

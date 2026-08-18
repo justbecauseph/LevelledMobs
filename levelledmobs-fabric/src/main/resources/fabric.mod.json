@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "lampas-levelledmobs",
+  "version": "${version}",
+  "name": "LevelledMobs",
+  "description": "RPG mob leveling system for Fabric / LampasCore",
+  "authors": [
+    "Lampas Team",
+    "LevelledMobs Contributors"
+  ],
+  "contact": {
+    "sources": "https://github.com/justbecauseph/LevelledMobs"
+  },
+  "license": "GPL-3.0-or-later",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "lampas.levelledmobs.LevelledMobsModule"
+    ]
+  },
+  "mixins": [
+    "lampas-levelledmobs.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": ">=26.2-",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "placeholder-api": "*"
+  }
+}
