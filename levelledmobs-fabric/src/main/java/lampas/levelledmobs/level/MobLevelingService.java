@@ -27,12 +27,25 @@ public class MobLevelingService {
     private final RuleManager ruleManager;
     private final AttributeScalingService attributeService;
     private final NametagService nametagService;
+    private final BossClassifier bossClassifier;
     private final RandomSource random = RandomSource.create();
 
     public MobLevelingService(RuleManager ruleManager, AttributeScalingService attributeService, NametagService nametagService) {
+        this(ruleManager, attributeService, nametagService, new BossClassifier());
+    }
+
+    public MobLevelingService(RuleManager ruleManager, AttributeScalingService attributeService, NametagService nametagService, BossClassifier bossClassifier) {
         this.ruleManager = ruleManager;
         this.attributeService = attributeService;
         this.nametagService = nametagService;
+        this.bossClassifier = bossClassifier != null ? bossClassifier : new BossClassifier();
+    }
+
+    /**
+     * Primary entry point for leveling an entity with a specified SpawnReason.
+     */
+    public void level(LivingEntity entity, SpawnReason spawnReason) {
+        onEntityLoad(entity, spawnReason);
     }
 
     /**
@@ -60,8 +73,14 @@ public class MobLevelingService {
             return;
         }
 
-        // 2. Build MobContext and evaluate against RuleManager
-        MobContext context = MobContext.of(entity, spawnReason);
+        // 2. Check boss filter
+        if (!bossClassifier.shouldLevel(entity)) {
+            return;
+        }
+
+        // 3. Build MobContext and evaluate against RuleManager
+        SpawnReason effectiveReason = SpawnReasonResolver.infer(entity, spawnReason);
+        MobContext context = MobContext.of(entity, effectiveReason);
         RuleResult result = ruleManager.resolve(context);
 
         if (result.matched() && entity instanceof Monster && !entity.isBaby()) {

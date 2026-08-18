@@ -2,7 +2,10 @@ package lampas.levelledmobs;
 
 import lampas.levelledmobs.attributes.AttributeScalingService;
 import lampas.levelledmobs.command.LevelledMobsCommand;
+import lampas.levelledmobs.events.ChunkLifecycleHandler;
+import lampas.levelledmobs.events.EntityLifecycleHandler;
 import lampas.levelledmobs.level.MobLevelingService;
+import lampas.levelledmobs.level.MobProcessingQueue;
 import lampas.levelledmobs.nametag.NametagService;
 import lampas.levelledmobs.rules.RuleManager;
 import net.fabricmc.api.ModInitializer;
@@ -25,6 +28,7 @@ public class LevelledMobsModule implements ModInitializer {
     private AttributeScalingService attributeScalingService;
     private NametagService nametagService;
     private MobLevelingService mobLevelingService;
+    private MobProcessingQueue processingQueue;
 
     @Override
     public void onInitialize() {
@@ -35,13 +39,11 @@ public class LevelledMobsModule implements ModInitializer {
         this.attributeScalingService = new AttributeScalingService();
         this.nametagService = new NametagService();
         this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService);
+        this.processingQueue = new MobProcessingQueue(mobLevelingService);
 
-        // Register entity load event
-        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            if (entity instanceof LivingEntity livingEntity) {
-                mobLevelingService.onEntityLoad(livingEntity);
-            }
-        });
+        // Register lifecycle event handlers
+        new EntityLifecycleHandler(processingQueue).register();
+        new ChunkLifecycleHandler(processingQueue).register();
 
         // Register Brigadier commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -55,6 +57,14 @@ public class LevelledMobsModule implements ModInitializer {
         return instance;
     }
 
+    public static MobLevelingService getMobLevelingService() {
+        return instance != null ? instance.mobLevelingService : null;
+    }
+
+    public static MobProcessingQueue getProcessingQueue() {
+        return instance != null ? instance.processingQueue : null;
+    }
+
     public RuleManager getRuleManager() {
         return ruleManager;
     }
@@ -65,9 +75,5 @@ public class LevelledMobsModule implements ModInitializer {
 
     public NametagService getNametagService() {
         return nametagService;
-    }
-
-    public MobLevelingService getMobLevelingService() {
-        return mobLevelingService;
     }
 }
