@@ -1,12 +1,14 @@
 package lampas.levelledmobs.config;
 
+import lampas.levelledmobs.nametag.NametagVisibility;
+
 /**
  * Main global settings configuration record.
  */
 public record LevelledMobsConfig(
     int maxMobsPerTick,
     String nametagTemplate,
-    boolean nametagVisible,
+    NametagVisibility nametagVisibility,
     boolean allowBossLeveling,
     boolean debug,
     double defaultXpMultiplier,
@@ -15,10 +17,14 @@ public record LevelledMobsConfig(
     public static final LevelledMobsConfig DEFAULT = new LevelledMobsConfig(
         50,
         "<gray>Lv. <yellow><level></yellow> <white><mob_name></white>",
-        true,
+        NametagVisibility.HOVER_ONLY,
         false,
         false,
         0.10,
         0.05
     );
+
+    public boolean nametagVisible() {
+        return nametagVisibility == NametagVisibility.ALWAYS;
+    }
 }

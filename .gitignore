@@ -23,3 +23,5 @@ build/
 # Local
 local/
 levelledmobs-fabric/logs
+levelledmobs-fabric/run
+run/

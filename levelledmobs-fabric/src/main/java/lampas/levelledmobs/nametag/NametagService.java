@@ -12,7 +12,7 @@ public class NametagService {
     private static final Logger LOGGER = LoggerFactory.getLogger("LevelledMobs");
 
     private NametagTemplate template;
-    private boolean nametagVisible = true;
+    private NametagVisibility visibility = NametagVisibility.HOVER_ONLY;
 
     public NametagService() {
         this("<gray>Lv. <yellow><level></yellow> <white><mob_name></white>");
@@ -37,10 +37,17 @@ public class NametagService {
             return;
         }
 
+        if (visibility == NametagVisibility.NEVER) {
+            entity.setCustomName(null);
+            entity.setCustomNameVisible(false);
+            return;
+        }
+
         try {
             Component nameComponent = template.render(entity, level, ruleSet);
             entity.setCustomName(nameComponent);
-            entity.setCustomNameVisible(nametagVisible);
+            // If ALWAYS, nametag is visible through blocks. If HOVER_ONLY, it only renders when aimed at in direct line of sight.
+            entity.setCustomNameVisible(visibility == NametagVisibility.ALWAYS);
         } catch (Exception e) {
             LOGGER.error("Failed to format nametag for entity {} (UUID: {})",
                 entity.getType().getDescription().getString(), entity.getUUID(), e);
@@ -55,11 +62,19 @@ public class NametagService {
         return template;
     }
 
-    public boolean isNametagVisible() {
-        return nametagVisible;
+    public void setVisibility(NametagVisibility visibility) {
+        this.visibility = (visibility != null) ? visibility : NametagVisibility.HOVER_ONLY;
+    }
+
+    public NametagVisibility getVisibility() {
+        return visibility;
     }
 
     public void setNametagVisible(boolean visible) {
-        this.nametagVisible = visible;
+        this.visibility = visible ? NametagVisibility.ALWAYS : NametagVisibility.HOVER_ONLY;
+    }
+
+    public boolean isNametagVisible() {
+        return visibility == NametagVisibility.ALWAYS;
     }
 }

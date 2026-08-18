@@ -70,7 +70,7 @@ public class ConfigLoader {
             }
             if (nametagService != null) {
                 nametagService.setTemplate(currentConfig.nametagTemplate());
-                nametagService.setNametagVisible(currentConfig.nametagVisible());
+                nametagService.setVisibility(currentConfig.nametagVisibility());
             }
             XpScalingService.setMultiplierPerLevel(currentConfig.defaultXpMultiplier());
             DropScalingService.setItemDropMultiplierPerLevel(currentConfig.defaultDropMultiplier());

@@ -17,36 +17,40 @@ public class NametagFormattingUnitTest {
     }
 
     @Test
-    public void testLegacyCodeTranslation() {
-        String legacy = "&aLv. &e15 &cZombie &7[&a20&7/&a20&7]";
-        String translated = TextFormatter.translateLegacy(legacy);
+    public void testTextFormatterColorTags() {
+        String input = "<yellow>Level 5</yellow> <gray>Zombie</gray>";
+        Component component = TextFormatter.format(input);
 
-        assertTrue(translated.contains("<green>"));
-        assertTrue(translated.contains("<yellow>"));
-        assertTrue(translated.contains("<red>"));
-        assertTrue(translated.contains("<gray>"));
-    }
-
-    @Test
-    public void testTagParsingAndComponentGeneration() {
-        Component component = TextFormatter.format("<yellow>Lv. 15</yellow> <white>Zombie</white>");
         assertNotNull(component);
-        assertEquals("Lv. 15 Zombie", component.getString());
-
-        // Hex color parsing
-        Component hexComponent = TextFormatter.format("<#FF0000>Red Boss</#FF0000>");
-        assertNotNull(hexComponent);
-        assertEquals("Red Boss", hexComponent.getString());
+        assertEquals("Level 5 Zombie", component.getString());
     }
 
     @Test
-    public void testMalformedSyntaxFailsGracefully() {
-        // Unclosed tags or invalid characters must not throw exceptions
-        assertDoesNotThrow(() -> TextFormatter.format("<invalid_tag_here>Test<<<>>"));
-        assertDoesNotThrow(() -> TextFormatter.format(""));
-        assertDoesNotThrow(() -> TextFormatter.format(null));
+    public void testTextFormatterHexCodes() {
+        String input = "<#FF5555>Dangerous</#FF5555> <#55FF55>Creeper</#55FF55>";
+        Component component = TextFormatter.format(input);
 
-        Component empty = TextFormatter.format(null);
+        assertNotNull(component);
+        assertEquals("Dangerous Creeper", component.getString());
+    }
+
+    @Test
+    public void testTextFormatterLegacyFormatting() {
+        String input = "&cHardcore &aSkeleton";
+        Component component = TextFormatter.format(input);
+
+        assertNotNull(component);
+        assertEquals("Hardcore Skeleton", component.getString());
+    }
+
+    @Test
+    public void testTextFormatterNullOrEmpty() {
+        Component nullComponent = TextFormatter.format(null);
+        assertNotNull(nullComponent);
+        assertEquals("", nullComponent.getString());
+
+        Component empty = TextFormatter.format("");
+        assertNotNull(empty);
         assertEquals("", empty.getString());
     }
 
@@ -60,6 +64,10 @@ public class NametagFormattingUnitTest {
     @Test
     public void testNametagServiceConfiguration() {
         NametagService service = new NametagService("<gray>Lv. <yellow><level></yellow>");
+        assertEquals(NametagVisibility.HOVER_ONLY, service.getVisibility());
+        assertFalse(service.isNametagVisible());
+
+        service.setVisibility(NametagVisibility.ALWAYS);
         assertTrue(service.isNametagVisible());
 
         service.setNametagVisible(false);

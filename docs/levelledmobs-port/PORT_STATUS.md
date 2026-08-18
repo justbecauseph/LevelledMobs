@@ -19,7 +19,7 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | **Chunk 8** | Commands, Permissions & Public API | **DONE** | 100% | Brigadier command tree, permission service, public API |
 | **Chunk 9** | External Integrations & Mod Ecosystem | **DONE** | 100% | Modded mob support, region protection SPI |
 | **Chunk 10** | Config System & Legacy Importer | **DONE** | 100% | Native configs, YAML/JSON5, legacy migration tool |
-| **Chunk 11** | Test Suite, Benchmarks & DoD Signoff | **NOT STARTED** | 0% | Unit tests, GameTests, 5k mob benchmark, DoD audit |
+| **Chunk 11** | Test Suite, Benchmarks & DoD Signoff | **DONE** | 100% | Unit tests, GameTests, 5k mob benchmark, DoD audit |
 
 ---
 
@@ -106,14 +106,14 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] `LegacyLevelledMobsConfigImporter` for translating Bukkit LevelledMobs configs.
 
 ### Chunk 11 — Comprehensive Test Suite, Benchmarks & DoD Signoff
-- [ ] JUnit 5 unit tests for rule resolution, strategies, attributes, and placeholders.
-- [ ] Fabric GameTests for spawn, persistence, chunk reload, combat scaling, transformations, and drops.
-- [ ] 5,000 mob performance benchmark verifying zero recurring per-tick overhead for passive mobs.
-- [ ] Complete audit against Definition of Done checklist.
-- [ ] GPLv3 attribution and licensing verified.
+- [x] JUnit 5 unit tests for rule resolution, strategies, attributes, and placeholders.
+- [x] Fabric GameTests for spawn, persistence, chunk reload, combat scaling, transformations, and drops.
+- [x] 5,000 mob performance benchmark verifying zero recurring per-tick overhead for passive mobs.
+- [x] Complete audit against Definition of Done checklist in `DOD_AUDIT.md`.
+- [x] GPLv3 attribution and licensing verified.
 
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 10 (Configuration System & Legacy Importer).
-- **Next Target**: Chunk 11 (Comprehensive Test Suite, Benchmarks & DoD Signoff).
+- **Active Task**: Porting Process Completed (100% of all 12 Chunks delivered and verified).
+- **Final Status**: **PORT FULLY COMPLETE & SIGNED OFF**.

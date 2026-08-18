@@ -1,6 +1,7 @@
 package lampas.levelledmobs.config;
 
 import lampas.levelledmobs.config.legacy.LegacyLevelledMobsConfigImporter;
+import lampas.levelledmobs.nametag.NametagVisibility;
 import lampas.levelledmobs.rules.LevelRule;
 import lampas.levelledmobs.rules.RuleManager;
 import net.minecraft.SharedConstants;
@@ -31,7 +32,7 @@ public class ConfigSystemUnitTest {
 
         assertNotNull(loader.getCurrentConfig());
         assertEquals(50, loader.getCurrentConfig().maxMobsPerTick());
-        assertTrue(loader.getCurrentConfig().nametagVisible());
+        assertEquals(NametagVisibility.HOVER_ONLY, loader.getCurrentConfig().nametagVisibility());
         assertEquals(0.10, loader.getCurrentConfig().defaultXpMultiplier(), 0.001);
 
         assertTrue(tempDir.resolve("settings.json").toFile().exists());

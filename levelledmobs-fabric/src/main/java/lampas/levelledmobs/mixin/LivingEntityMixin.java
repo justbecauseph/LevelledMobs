@@ -2,13 +2,16 @@ package lampas.levelledmobs.mixin;
 
 import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.Optional;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin implements LevelledMobHolder {
@@ -26,24 +29,25 @@ public abstract class LivingEntityMixin implements LevelledMobHolder {
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
-    private void lampas$writeLevelDataToNbt(CompoundTag tag, CallbackInfo ci) {
+    private void lampas$writeLevelDataToNbt(ValueOutput output, CallbackInfo ci) {
         if (this.lampas$levelData != null && this.lampas$levelData.levelled()) {
-            tag.putInt("lampas:level", this.lampas$levelData.level());
-            tag.putBoolean("lampas:levelled", this.lampas$levelData.levelled());
+            output.putInt("lampas:level", this.lampas$levelData.level());
+            output.putBoolean("lampas:levelled", this.lampas$levelData.levelled());
             if (this.lampas$levelData.ruleSet() != null) {
-                tag.putString("lampas:rule", this.lampas$levelData.ruleSet());
+                output.putString("lampas:rule", this.lampas$levelData.ruleSet());
             }
-            tag.putLong("lampas:generated_at", this.lampas$levelData.generatedAt());
+            output.putLong("lampas:generated_at", this.lampas$levelData.generatedAt());
         }
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
-    private void lampas$readLevelDataFromNbt(CompoundTag tag, CallbackInfo ci) {
-        if (tag.contains("lampas:level")) {
-            int level = tag.getInt("lampas:level").orElse(0);
-            boolean levelled = tag.getBoolean("lampas:levelled").orElse(false);
-            String rule = tag.getString("lampas:rule").orElse("default");
-            long generatedAt = tag.getLong("lampas:generated_at").orElse(System.currentTimeMillis());
+    private void lampas$readLevelDataFromNbt(ValueInput input, CallbackInfo ci) {
+        Optional<Integer> levelOpt = input.getInt("lampas:level");
+        if (levelOpt.isPresent()) {
+            int level = levelOpt.get();
+            boolean levelled = input.getBooleanOr("lampas:levelled", true);
+            String rule = input.getStringOr("lampas:rule", "default");
+            long generatedAt = input.getLongOr("lampas:generated_at", System.currentTimeMillis());
             this.lampas$levelData = new LevelledMobData(level, levelled, rule, generatedAt);
         }
     }
