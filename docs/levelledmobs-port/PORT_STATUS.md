@@ -15,7 +15,7 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | **Chunk 4** | Attribute Scaling Engine & Combat Pipeline | **DONE** | 100% | 8 attributes, idempotent modifiers, `HealthPolicy` |
 | **Chunk 5** | Entity Lifecycle & Spawning Pipeline | **DONE** | 100% | Spawning provenance, conversions, chunk loading, queue |
 | **Chunk 6** | Drops, Loot & XP Scaling System | **DONE** | 100% | XP scaling, loot multipliers, custom drop engine |
-| **Chunk 7** | Nametag & Text Formatting Engine | **NOT STARTED** | 0% | Server-side nametags, TextPlaceholderAPI integration |
+| **Chunk 7** | Nametag & Text Formatting Engine | **DONE** | 100% | Server-side nametags, TextPlaceholderAPI integration |
 | **Chunk 8** | Commands, Permissions & Public API | **NOT STARTED** | 0% | Brigadier command tree, permission service, public API |
 | **Chunk 9** | External Integrations & Mod Ecosystem | **NOT STARTED** | 0% | Modded mob support, region protection SPI |
 | **Chunk 10** | Config System & Legacy Importer | **NOT STARTED** | 0% | Native configs, YAML/JSON5, legacy migration tool |
@@ -82,10 +82,10 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] `MobEquipmentService` with modern Minecraft Data Components and drop chances.
 
 ### Chunk 7 — Nametag & Text Formatting Engine
-- [ ] `TextFormatter` abstracting Minecraft `Text` styling.
-- [ ] TextPlaceholderAPI integration with registered `%lampas:*%` placeholders.
-- [ ] Template placeholder parser supporting `<level>`, `<mob_name>`, `<health>`, `<max_health>`, `<health_percent>`.
-- [ ] Event-driven nametag updates on damage and healing without per-tick polling.
+- [x] `TextFormatter` abstracting Minecraft `Text` styling.
+- [x] TextPlaceholderAPI integration with registered `%lampas:*%` placeholders.
+- [x] Template placeholder parser supporting `<level>`, `<mob_name>`, `<health>`, `<max_health>`, `<health_percent>`.
+- [x] Event-driven nametag updates on damage and healing without per-tick polling.
 
 ### Chunk 8 — Commands, Permissions & Public API
 - [ ] Brigadier command tree registered under `/levelledmobs` and alias `/lm`.
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 6 (Drops, Loot & XP Scaling System).
-- **Next Target**: Chunk 7 (Nametag & Text Formatting Engine).
+- **Active Task**: Completed Chunk 7 (Nametag & Text Formatting Engine).
+- **Next Target**: Chunk 8 (Commands, Permissions & Public API).
