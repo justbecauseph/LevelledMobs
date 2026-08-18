@@ -16,7 +16,7 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | **Chunk 5** | Entity Lifecycle & Spawning Pipeline | **DONE** | 100% | Spawning provenance, conversions, chunk loading, queue |
 | **Chunk 6** | Drops, Loot & XP Scaling System | **DONE** | 100% | XP scaling, loot multipliers, custom drop engine |
 | **Chunk 7** | Nametag & Text Formatting Engine | **DONE** | 100% | Server-side nametags, TextPlaceholderAPI integration |
-| **Chunk 8** | Commands, Permissions & Public API | **NOT STARTED** | 0% | Brigadier command tree, permission service, public API |
+| **Chunk 8** | Commands, Permissions & Public API | **DONE** | 100% | Brigadier command tree, permission service, public API |
 | **Chunk 9** | External Integrations & Mod Ecosystem | **NOT STARTED** | 0% | Modded mob support, region protection SPI |
 | **Chunk 10** | Config System & Legacy Importer | **NOT STARTED** | 0% | Native configs, YAML/JSON5, legacy migration tool |
 | **Chunk 11** | Test Suite, Benchmarks & DoD Signoff | **NOT STARTED** | 0% | Unit tests, GameTests, 5k mob benchmark, DoD audit |
@@ -88,11 +88,11 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] Event-driven nametag updates on damage and healing without per-tick polling.
 
 ### Chunk 8 — Commands, Permissions & Public API
-- [ ] Brigadier command tree registered under `/levelledmobs` and alias `/lm`.
-- [ ] Subcommands: `/lm info`, `/lm reload`, `/lm inspect`, `/lm rules`, `/lm level`, `/lm summon`, `/lm debug`.
-- [ ] `PermissionService` with OP fallback and Fabric Permissions API.
-- [ ] Public API: `LevelledMobsApi` interface and singleton.
-- [ ] Event callbacks: `MobPreLevelCallback` and `MobPostLevelCallback`.
+- [x] Brigadier command tree registered under `/levelledmobs` and alias `/lm`.
+- [x] Subcommands: `/lm info`, `/lm reload`, `/lm inspect`, `/lm rules`, `/lm level`, `/lm summon`, `/lm debug`.
+- [x] `PermissionService` with OP fallback and Fabric Permissions API.
+- [x] Public API: `LevelledMobsApi` interface and singleton.
+- [x] Event callbacks: `MobPreLevelCallback` and `MobPostLevelCallback`.
 
 ### Chunk 9 — External Integrations & Mod Ecosystem Compatibility
 - [ ] `RegionProtectionProvider` SPI for claims mods (FLAN, GOML, Common Protection API).
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 7 (Nametag & Text Formatting Engine).
-- **Next Target**: Chunk 8 (Commands, Permissions & Public API).
+- **Active Task**: Completed Chunk 8 (Commands, Permissions & Public API).
+- **Next Target**: Chunk 9 (External Integrations & Mod Ecosystem Compatibility).

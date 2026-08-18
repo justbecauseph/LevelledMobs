@@ -50,4 +50,20 @@ public class RuleManager {
     public CompiledRules getCompiledRules() {
         return compiledRules.get();
     }
+
+    public int size() {
+        return compiledRules.get().ruleCount();
+    }
+
+    public boolean isEmpty() {
+        return compiledRules.get().ruleCount() == 0;
+    }
+
+    public List<LevelRule> getRules() {
+        return compiledRules.get().rules();
+    }
+
+    public void reload() {
+        LOGGER.info("Reloading LevelledMobs rule engine...");
+    }
 }

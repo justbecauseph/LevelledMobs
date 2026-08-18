@@ -47,7 +47,7 @@ public class LevelledMobsModule implements ModInitializer {
 
         // Register Brigadier commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            LevelledMobsCommand.register(dispatcher);
+            LevelledMobsCommand.register(dispatcher, registryAccess);
         });
 
         LOGGER.info("LevelledMobs Fabric module initialized successfully.");
@@ -65,15 +65,15 @@ public class LevelledMobsModule implements ModInitializer {
         return instance != null ? instance.processingQueue : null;
     }
 
-    public RuleManager getRuleManager() {
-        return ruleManager;
+    public static RuleManager getRuleManager() {
+        return instance != null ? instance.ruleManager : null;
     }
 
-    public AttributeScalingService getAttributeScalingService() {
-        return attributeScalingService;
+    public static AttributeScalingService getAttributeScalingService() {
+        return instance != null ? instance.attributeScalingService : null;
     }
 
-    public NametagService getNametagService() {
-        return nametagService;
+    public static NametagService getNametagService() {
+        return instance != null ? instance.nametagService : null;
     }
 }

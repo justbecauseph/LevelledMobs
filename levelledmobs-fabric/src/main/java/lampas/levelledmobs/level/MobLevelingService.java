@@ -88,11 +88,25 @@ public class MobLevelingService {
             LevelStrategy strategy = StrategyRegistry.INSTANCE.getStrategy(rule.strategyName());
             int level = strategy.calculateLevel(context, rule);
 
+            // Trigger pre-level callback to allow modders to cancel or alter level
+            lampas.levelledmobs.api.events.MobPreLevelCallback.Result preResult =
+                lampas.levelledmobs.api.events.MobPreLevelCallback.EVENT.invoker().onPreLevel(entity, level, rule.primaryRuleId());
+
+            if (preResult.isCancelled()) {
+                return;
+            }
+            if (preResult.getNewLevel() > 0) {
+                level = preResult.getNewLevel();
+            }
+
             LevelledMobData newData = LevelledMobData.of(level, rule.primaryRuleId());
             holder.lampas$setLevelData(newData);
 
             attributeService.applyModifiers(entity, level, rule, HealthPolicy.FRESH_SPAWN);
-            nametagService.updateNametag(entity, level);
+            nametagService.updateNametag(entity, level, rule.primaryRuleId());
+
+            // Trigger post-level callback
+            lampas.levelledmobs.api.events.MobPostLevelCallback.EVENT.invoker().onPostLevel(entity, level, rule.primaryRuleId());
 
             LOGGER.debug("Levelled {} (UUID: {}) to Lv. {} via strategy '{}' in rule '{}'",
                 entity.getType().getDescription().getString(), entity.getUUID(), level, rule.strategyName(), rule.primaryRuleId());
