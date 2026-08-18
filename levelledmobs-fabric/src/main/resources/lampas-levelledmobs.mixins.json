@@ -6,7 +6,8 @@
   "mixins": [
     "LivingEntityMixin",
     "LivingEntityCombatMixin",
-    "EntityConversionMixin"
+    "EntityConversionMixin",
+    "LivingEntityDeathMixin"
   ],
   "injectors": {
     "defaultRequire": 1

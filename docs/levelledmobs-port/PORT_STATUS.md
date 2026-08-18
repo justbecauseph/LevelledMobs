@@ -14,7 +14,7 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | **Chunk 3** | Levelling Strategy Subsystem | **DONE** | 100% | Random, Distance, Y, Player, Custom strategies |
 | **Chunk 4** | Attribute Scaling Engine & Combat Pipeline | **DONE** | 100% | 8 attributes, idempotent modifiers, `HealthPolicy` |
 | **Chunk 5** | Entity Lifecycle & Spawning Pipeline | **DONE** | 100% | Spawning provenance, conversions, chunk loading, queue |
-| **Chunk 6** | Drops, Loot & XP Scaling System | **NOT STARTED** | 0% | XP scaling, loot multipliers, custom drop engine |
+| **Chunk 6** | Drops, Loot & XP Scaling System | **DONE** | 100% | XP scaling, loot multipliers, custom drop engine |
 | **Chunk 7** | Nametag & Text Formatting Engine | **NOT STARTED** | 0% | Server-side nametags, TextPlaceholderAPI integration |
 | **Chunk 8** | Commands, Permissions & Public API | **NOT STARTED** | 0% | Brigadier command tree, permission service, public API |
 | **Chunk 9** | External Integrations & Mod Ecosystem | **NOT STARTED** | 0% | Modded mob support, region protection SPI |
@@ -76,10 +76,10 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] `MIXINS.md` fully documented.
 
 ### Chunk 6 — Drops, Loot & XP Scaling System
-- [ ] `XpScalingService` hooked into death XP drop calculation.
-- [ ] Stage A drop scaling: vanilla loot multiplier based on `EffectiveRule`.
-- [ ] Stage B custom drops: registry item ID matching, sliding chance, level requirements, quantities.
-- [ ] `MobEquipmentService` with modern Minecraft Data Components and drop chances.
+- [x] `XpScalingService` hooked into death XP drop calculation.
+- [x] Stage A drop scaling: vanilla loot multiplier based on `EffectiveRule`.
+- [x] Stage B custom drops: registry item ID matching, sliding chance, level requirements, quantities.
+- [x] `MobEquipmentService` with modern Minecraft Data Components and drop chances.
 
 ### Chunk 7 — Nametag & Text Formatting Engine
 - [ ] `TextFormatter` abstracting Minecraft `Text` styling.
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 5 (Entity Lifecycle, Transformations & Spawning Pipeline).
-- **Next Target**: Chunk 6 (Drops, Loot & XP Scaling System).
+- **Active Task**: Completed Chunk 6 (Drops, Loot & XP Scaling System).
+- **Next Target**: Chunk 7 (Nametag & Text Formatting Engine).

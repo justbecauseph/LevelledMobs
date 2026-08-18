@@ -31,5 +31,12 @@ This document catalogs every Mixin introduced in `lampas.levelledmobs.mixin`, de
 ### 3. `EntityConversionMixin`
 - **Target Class**: `net.minecraft.world.entity.Mob`
 - **Injections**:
-  - `convertTo(EntityType<T> entityType, ConversionParams conversionParams, ConversionCallback<T> conversionCallback)` at `RETURN`: Transfers `LevelledMobData` from the original mob to the newly converted mob.
+  - `convertTo` at `RETURN`: Transfers `LevelledMobData` from the original mob to the newly converted mob.
 - **Rationale**: Ensures entity transformations (such as Zombie transforming to Drowned in water, Villager converting to Zombie Villager, or Piglin converting to Zombified Piglin) retain their exact level and attribute scaling instead of resetting or rerolling.
+
+### 4. `LivingEntityDeathMixin`
+- **Target Class**: `net.minecraft.world.entity.LivingEntity`
+- **Injections**:
+  - `getExperienceReward(ServerLevel level, Entity attackingPlayer)` at `RETURN` (`cancellable = true`): Adjusts the dropped XP reward dynamically using `XpScalingService.calculateXp(baseXp, level)` before XP orbs are spawned.
+  - `dropCustomDeathLoot(ServerLevel level, DamageSource damageSource, boolean hitByPlayer)` at `TAIL`: Spawns configured custom drops via `CustomDropsHandler.handleDeathDrops(...)`.
+- **Rationale**: Native and non-intrusive hook for death experience rewards and custom drop table generation without spawning duplicate XP orbs or double-triggering loot tables.
