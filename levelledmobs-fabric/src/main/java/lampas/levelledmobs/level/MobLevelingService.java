@@ -73,8 +73,14 @@ public class MobLevelingService {
             return;
         }
 
-        // 2. Check boss filter
-        if (!bossClassifier.shouldLevel(entity)) {
+        // 2. Check boss filter and custom entity bypass
+        if (!bossClassifier.shouldLevel(entity) || lampas.levelledmobs.compatibility.ModdedMobHandler.shouldBypass(entity)) {
+            return;
+        }
+
+        // 2b. Check region protection
+        if (entity.level() instanceof net.minecraft.server.level.ServerLevel serverLevel &&
+            !lampas.levelledmobs.compatibility.ModdedMobHandler.canLevelAt(serverLevel, entity.blockPosition(), entity)) {
             return;
         }
 
@@ -86,7 +92,9 @@ public class MobLevelingService {
         if (result.matched() && entity instanceof Monster && !entity.isBaby()) {
             EffectiveRule rule = result.effectiveRule();
             LevelStrategy strategy = StrategyRegistry.INSTANCE.getStrategy(rule.strategyName());
-            int level = strategy.calculateLevel(context, rule);
+
+            int level = lampas.levelledmobs.compatibility.ModdedMobHandler.getPredefinedLevel(entity)
+                .orElseGet(() -> strategy.calculateLevel(context, rule));
 
             // Trigger pre-level callback to allow modders to cancel or alter level
             lampas.levelledmobs.api.events.MobPreLevelCallback.Result preResult =

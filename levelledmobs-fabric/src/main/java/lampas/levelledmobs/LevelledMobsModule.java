@@ -29,6 +29,7 @@ public class LevelledMobsModule implements ModInitializer {
     private NametagService nametagService;
     private MobLevelingService mobLevelingService;
     private MobProcessingQueue processingQueue;
+    private lampas.levelledmobs.config.ConfigLoader configLoader;
 
     @Override
     public void onInitialize() {
@@ -40,6 +41,10 @@ public class LevelledMobsModule implements ModInitializer {
         this.nametagService = new NametagService();
         this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService);
         this.processingQueue = new MobProcessingQueue(mobLevelingService);
+
+        // Load configuration and rules
+        this.configLoader = new lampas.levelledmobs.config.ConfigLoader();
+        this.configLoader.load(ruleManager, nametagService, processingQueue);
 
         // Register lifecycle event handlers
         new EntityLifecycleHandler(processingQueue).register();
@@ -75,5 +80,9 @@ public class LevelledMobsModule implements ModInitializer {
 
     public static NametagService getNametagService() {
         return instance != null ? instance.nametagService : null;
+    }
+
+    public static lampas.levelledmobs.config.ConfigLoader getConfigLoader() {
+        return instance != null ? instance.configLoader : null;
     }
 }

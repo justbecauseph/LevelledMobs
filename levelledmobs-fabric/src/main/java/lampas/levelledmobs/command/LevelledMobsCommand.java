@@ -240,7 +240,13 @@ public class LevelledMobsCommand {
         CommandSourceStack source = ctx.getSource();
         long start = System.currentTimeMillis();
 
-        if (LevelledMobsModule.getRuleManager() != null) {
+        if (LevelledMobsModule.getConfigLoader() != null) {
+            LevelledMobsModule.getConfigLoader().load(
+                LevelledMobsModule.getRuleManager(),
+                LevelledMobsModule.getNametagService(),
+                LevelledMobsModule.getProcessingQueue()
+            );
+        } else if (LevelledMobsModule.getRuleManager() != null) {
             LevelledMobsModule.getRuleManager().reload();
         }
 

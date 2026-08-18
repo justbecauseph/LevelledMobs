@@ -17,8 +17,8 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 | **Chunk 6** | Drops, Loot & XP Scaling System | **DONE** | 100% | XP scaling, loot multipliers, custom drop engine |
 | **Chunk 7** | Nametag & Text Formatting Engine | **DONE** | 100% | Server-side nametags, TextPlaceholderAPI integration |
 | **Chunk 8** | Commands, Permissions & Public API | **DONE** | 100% | Brigadier command tree, permission service, public API |
-| **Chunk 9** | External Integrations & Mod Ecosystem | **NOT STARTED** | 0% | Modded mob support, region protection SPI |
-| **Chunk 10** | Config System & Legacy Importer | **NOT STARTED** | 0% | Native configs, YAML/JSON5, legacy migration tool |
+| **Chunk 9** | External Integrations & Mod Ecosystem | **DONE** | 100% | Modded mob support, region protection SPI |
+| **Chunk 10** | Config System & Legacy Importer | **DONE** | 100% | Native configs, YAML/JSON5, legacy migration tool |
 | **Chunk 11** | Test Suite, Benchmarks & DoD Signoff | **NOT STARTED** | 0% | Unit tests, GameTests, 5k mob benchmark, DoD audit |
 
 ---
@@ -95,15 +95,15 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] Event callbacks: `MobPreLevelCallback` and `MobPostLevelCallback`.
 
 ### Chunk 9 — External Integrations & Mod Ecosystem Compatibility
-- [ ] `RegionProtectionProvider` SPI for claims mods (FLAN, GOML, Common Protection API).
-- [ ] Modded entity registry IDs and tags verified without hardcoded enums.
-- [ ] Modded biomes and dimensions tested with rule conditions.
-- [ ] `PlayerLevelProvider` SPI for RPG level mods.
+- [x] `RegionProtectionProvider` SPI for claims mods (FLAN, GOML, Common Protection API).
+- [x] Modded entity registry IDs and tags verified without hardcoded enums.
+- [x] Modded biomes and dimensions tested with rule conditions.
+- [x] `PlayerLevelProvider` SPI for RPG level mods.
 
 ### Chunk 10 — Configuration System & Legacy Importer
-- [ ] Native YAML / JSON5 configuration loader (`settings.yml`, `rules.yml`, `drops.yml`, `messages.yml`).
-- [ ] Configuration validation and schema verification.
-- [ ] `LegacyLevelledMobsConfigImporter` for translating Bukkit LevelledMobs configs.
+- [x] Native YAML / JSON5 configuration loader (`settings.yml`, `rules.yml`, `drops.yml`, `messages.yml`).
+- [x] Configuration validation and schema verification.
+- [x] `LegacyLevelledMobsConfigImporter` for translating Bukkit LevelledMobs configs.
 
 ### Chunk 11 — Comprehensive Test Suite, Benchmarks & DoD Signoff
 - [ ] JUnit 5 unit tests for rule resolution, strategies, attributes, and placeholders.
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 8 (Commands, Permissions & Public API).
-- **Next Target**: Chunk 9 (External Integrations & Mod Ecosystem Compatibility).
+- **Active Task**: Completed Chunk 10 (Configuration System & Legacy Importer).
+- **Next Target**: Chunk 11 (Comprehensive Test Suite, Benchmarks & DoD Signoff).

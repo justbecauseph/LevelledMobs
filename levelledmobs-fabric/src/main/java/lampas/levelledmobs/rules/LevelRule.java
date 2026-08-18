@@ -142,6 +142,15 @@ public class LevelRule implements Comparable<LevelRule> {
             return this;
         }
 
+        public Builder condition(lampas.levelledmobs.rules.conditions.RuleCondition condition) {
+            if (condition != null) {
+                java.util.List<lampas.levelledmobs.rules.conditions.RuleCondition> current = new java.util.ArrayList<>(this.predicate.conditions());
+                current.add(condition);
+                this.predicate = new RulePredicate(current);
+            }
+            return this;
+        }
+
         public Builder levelRange(IntRange range) {
             this.levelRange = range;
             return this;
