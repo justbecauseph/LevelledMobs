@@ -4,6 +4,7 @@ import lampas.levelledmobs.attributes.AttributeScalingService;
 import lampas.levelledmobs.command.LevelledMobsCommand;
 import lampas.levelledmobs.level.MobLevelingService;
 import lampas.levelledmobs.nametag.NametagService;
+import lampas.levelledmobs.rules.RuleManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -20,6 +21,7 @@ public class LevelledMobsModule implements ModInitializer {
 
     private static LevelledMobsModule instance;
 
+    private RuleManager ruleManager;
     private AttributeScalingService attributeScalingService;
     private NametagService nametagService;
     private MobLevelingService mobLevelingService;
@@ -29,9 +31,10 @@ public class LevelledMobsModule implements ModInitializer {
         instance = this;
         LOGGER.info("Initializing LevelledMobs Fabric module...");
 
+        this.ruleManager = new RuleManager();
         this.attributeScalingService = new AttributeScalingService();
         this.nametagService = new NametagService();
-        this.mobLevelingService = new MobLevelingService(attributeScalingService, nametagService);
+        this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService);
 
         // Register entity load event
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
@@ -50,6 +53,10 @@ public class LevelledMobsModule implements ModInitializer {
 
     public static LevelledMobsModule getInstance() {
         return instance;
+    }
+
+    public RuleManager getRuleManager() {
+        return ruleManager;
     }
 
     public AttributeScalingService getAttributeScalingService() {

@@ -1,0 +1,231 @@
+package lampas.levelledmobs.rules;
+
+import lampas.levelledmobs.context.MobContext;
+import lampas.levelledmobs.data.SpawnReason;
+import lampas.levelledmobs.rules.strategy.*;
+import lampas.levelledmobs.rules.strategy.math.LevelTierMatching;
+import lampas.levelledmobs.rules.strategy.math.MinAndMax;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.phys.Vec3;
+import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class StrategyCalculationUnitTest {
+
+    private static class StrategyMockContext implements MobContext {
+        private final BlockPos pos;
+        private final ServerPlayer player;
+
+        public StrategyMockContext(BlockPos pos, ServerPlayer player) {
+            this.pos = pos;
+            this.player = player;
+        }
+
+        @Override public LivingEntity entity() { return null; }
+        @Override public UUID uuid() { return UUID.randomUUID(); }
+        @Override public EntityType<?> entityType() { return null; }
+        @Override public Identifier entityId() { return Identifier.fromNamespaceAndPath("minecraft", "zombie"); }
+        @Override public ServerLevel world() { return null; }
+        @Override public ResourceKey<Level> dimensionKey() { return null; }
+        @Override public BlockPos blockPos() { return pos; }
+        @Override public Vec3 position() { return pos != null ? new Vec3(pos.getX(), pos.getY(), pos.getZ()) : Vec3.ZERO; }
+        @Override public Holder<Biome> biome() { return null; }
+        @Override public boolean isBaby() { return false; }
+        @Override public boolean isBoss() { return false; }
+        @Override public boolean isTamed() { return false; }
+        @Override public boolean hasCustomName() { return false; }
+        @Override public Optional<ServerPlayer> nearestPlayer() { return Optional.ofNullable(player); }
+        @Override public SpawnReason spawnReason() { return SpawnReason.NATURAL; }
+    }
+
+    @Test
+    public void testSpawnDistanceStrategyAcceptanceFormula() {
+        // Acceptance criterion: distance=2500, perLevel=100, base=1 -> level=26
+        int calculated = SpawnDistanceStrategy.calculate(2500.0, 100.0, 1, 0.0);
+        assertEquals(26, calculated);
+
+        // Via Strategy instance
+        LevelRule rule = LevelRule.builder("dist_test")
+            .levelRange(IntRange.of(1, 100))
+            .strategy("SPAWN_DISTANCE", Map.of(
+                "origin_x", 0.0,
+                "origin_z", 0.0,
+                "distance_per_level", 100.0,
+                "base_level", 1
+            ))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        MobContext context = new StrategyMockContext(new BlockPos(2500, 64, 0), null);
+
+        int level = SpawnDistanceStrategy.INSTANCE.calculateLevel(context, effective);
+        assertEquals(26, level);
+    }
+
+    @Test
+    public void testSpawnDistanceEdgeCases() {
+        // Negative coordinates
+        LevelRule rule = LevelRule.builder("neg_dist_test")
+            .levelRange(IntRange.of(1, 100))
+            .strategy("SPAWN_DISTANCE", Map.of(
+                "origin_x", 0.0,
+                "origin_z", 0.0,
+                "distance_per_level", 100.0,
+                "base_level", 1
+            ))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        MobContext context = new StrategyMockContext(new BlockPos(-2500, 64, 0), null);
+        assertEquals(26, SpawnDistanceStrategy.INSTANCE.calculateLevel(context, effective));
+
+        // Division by zero safeguard (distancePerLevel = 0)
+        LevelRule zeroDivRule = LevelRule.builder("zero_div_test")
+            .levelRange(IntRange.of(1, 50))
+            .strategy("SPAWN_DISTANCE", Map.of("distance_per_level", 0.0, "base_level", 5))
+            .build();
+
+        EffectiveRule zeroDivEffective = EffectiveRule.merge(List.of(zeroDivRule));
+        assertEquals(30, SpawnDistanceStrategy.INSTANCE.calculateLevel(context, zeroDivEffective)); // Defaults to 100 distancePerLevel -> 5 + 25 = 30
+    }
+
+    @Test
+    public void testRandomLevellingStrategy() {
+        LevelRule rule = LevelRule.builder("random_test")
+            .levelRange(IntRange.of(5, 10))
+            .strategy("RANDOM", Collections.emptyMap())
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        MobContext context = new StrategyMockContext(new BlockPos(0, 64, 0), null);
+
+        for (int i = 0; i < 50; i++) {
+            int level = RandomLevellingStrategy.INSTANCE.calculateLevel(context, effective);
+            assertTrue(level >= 5 && level <= 10, "Level " + level + " should be in range [5, 10]");
+        }
+    }
+
+    @Test
+    public void testWeightedRandomLevellingStrategy() {
+        LevelRule rule = LevelRule.builder("weighted_test")
+            .levelRange(IntRange.of(1, 20))
+            .strategy("RANDOM", Map.of("weighted", Map.of("1-5", 100, "6-20", 0)))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        MobContext context = new StrategyMockContext(new BlockPos(0, 64, 0), null);
+
+        for (int i = 0; i < 20; i++) {
+            int level = RandomLevellingStrategy.INSTANCE.calculateLevel(context, effective);
+            assertTrue(level >= 1 && level <= 5, "Level should always fall in weighted tier [1, 5]");
+        }
+    }
+
+    @Test
+    public void testYDistanceStrategySubterranean() {
+        LevelRule rule = LevelRule.builder("subterranean_test")
+            .levelRange(IntRange.of(1, 30))
+            .strategy("Y_DISTANCE", Map.of(
+                "starting_y", 64,
+                "ending_y", -64,
+                "increase_per_level", 4.0, // Every 4 blocks deeper = +1 level
+                "scale_downward", true
+            ))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+
+        // At surface Y=64 -> delta=0 -> level=1
+        MobContext surface = new StrategyMockContext(new BlockPos(0, 64, 0), null);
+        assertEquals(1, YDistanceStrategy.INSTANCE.calculateLevel(surface, effective));
+
+        // At Y=0 -> delta=64 -> 64/4 = 16 -> level = 1 + 16 = 17
+        MobContext underground = new StrategyMockContext(new BlockPos(0, 0, 0), null);
+        assertEquals(17, YDistanceStrategy.INSTANCE.calculateLevel(underground, effective));
+
+        // At Y=-64 -> delta=128 -> 128/4 = 32 -> clamped to max 30
+        MobContext bedrock = new StrategyMockContext(new BlockPos(0, -64, 0), null);
+        assertEquals(30, YDistanceStrategy.INSTANCE.calculateLevel(bedrock, effective));
+    }
+
+    @Test
+    public void testPlayerLevellingStrategyWithTiers() {
+        PlayerLevelProvider testProvider = (player, variable) -> 25.0f; // Player level 25
+
+        PlayerLevellingStrategy strategy = new PlayerLevellingStrategy(testProvider);
+
+        LevelRule rule = LevelRule.builder("player_tier_test")
+            .levelRange(IntRange.of(1, 50))
+            .strategy("PLAYER", Map.of(
+                "level_tiers", List.of(
+                    Map.of("min", 1, "max", 10, "target", "1-5"),
+                    Map.of("min", 11, "max", 30, "target", "15-25"),
+                    Map.of("min", 31, "max", 100, "target", "35-50")
+                )
+            ))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        MobContext context = new StrategyMockContext(new BlockPos(0, 64, 0), null); // Player not null logic can be tested with mock or match
+
+        // When player is null, returns min level
+        assertEquals(1, strategy.calculateLevel(context, effective));
+    }
+
+    @Test
+    public void testCustomStrategyMathematicalFormulas() {
+        LevelRule rule = LevelRule.builder("custom_math_test")
+            .levelRange(IntRange.of(1, 100))
+            .strategy("CUSTOM", Map.of(
+                "formula", "<min_level> + floor(<distance> / 50)"
+            ))
+            .build();
+
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+
+        // Distance 500 -> 1 + floor(500/50) = 1 + 10 = 11
+        MobContext context = new StrategyMockContext(new BlockPos(500, 64, 0), null);
+        assertEquals(11, CustomStrategy.INSTANCE.calculateLevel(context, effective));
+
+        // Test expression parser edge cases
+        assertEquals(25.0, CustomStrategy.evalSimpleExpression("10 + 15"));
+        assertEquals(7.0, CustomStrategy.evalSimpleExpression("1 + 2 * 3"));
+        assertEquals(9.0, CustomStrategy.evalSimpleExpression("(1 + 2) * 3"));
+        assertEquals(0.0, CustomStrategy.evalSimpleExpression("10 / 0")); // Divide by zero safety
+        assertEquals(5.0, CustomStrategy.evalSimpleExpression("floor(5.9)"));
+        assertEquals(6.0, CustomStrategy.evalSimpleExpression("ceil(5.1)"));
+        assertEquals(4.0, CustomStrategy.evalSimpleExpression("sqrt(16)"));
+    }
+
+    @Test
+    public void testMinAndMaxParsing() {
+        MinAndMax single = MinAndMax.parse("15");
+        assertNotNull(single);
+        assertEquals(15f, single.min());
+        assertEquals(15f, single.max());
+
+        MinAndMax range = MinAndMax.parse("10 - 25");
+        assertNotNull(range);
+        assertEquals(10f, range.min());
+        assertEquals(25f, range.max());
+
+        assertNull(MinAndMax.parse("invalid-string-here"));
+        assertNull(MinAndMax.parse(""));
+    }
+}

@@ -4,7 +4,8 @@
   "package": "lampas.levelledmobs.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "LivingEntityMixin"
+    "LivingEntityMixin",
+    "LivingEntityCombatMixin"
   ],
   "injectors": {
     "defaultRequire": 1

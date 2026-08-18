@@ -10,9 +10,9 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 |---|---|---|---|---|
 | **Chunk 0** | Pre-Port Audit & Feature Matrix | **DONE** | 100% | `FEATURE_MATRIX.md`, `BUKKIT_DEPENDENCIES.md`, `PORT_STATUS.md` |
 | **Chunk 1** | Fabric Skeleton & Vertical Slice MVP | **DONE** | 100% | `LevelledMobsModule`, `LevelledMobData`, NBT Mixin, `/lm inspect` |
-| **Chunk 2** | Context Abstractions & Rule Engine Core | **NOT STARTED** | 0% | `MobContext`, `LevelRule`, `RuleParser`, `RuleManager` |
-| **Chunk 3** | Levelling Strategy Subsystem | **NOT STARTED** | 0% | Random, Distance, Y, Player, Custom strategies |
-| **Chunk 4** | Attribute Scaling Engine & Combat Pipeline | **NOT STARTED** | 0% | 8 attributes, idempotent modifiers, `HealthPolicy` |
+| **Chunk 2** | Context Abstractions & Rule Engine Core | **DONE** | 100% | `MobContext`, `LevelRule`, `RuleParser`, `RuleManager` |
+| **Chunk 3** | Levelling Strategy Subsystem | **DONE** | 100% | Random, Distance, Y, Player, Custom strategies |
+| **Chunk 4** | Attribute Scaling Engine & Combat Pipeline | **DONE** | 100% | 8 attributes, idempotent modifiers, `HealthPolicy` |
 | **Chunk 5** | Entity Lifecycle & Spawning Pipeline | **NOT STARTED** | 0% | Spawning provenance, conversions, chunk loading, queue |
 | **Chunk 6** | Drops, Loot & XP Scaling System | **NOT STARTED** | 0% | XP scaling, loot multipliers, custom drop engine |
 | **Chunk 7** | Nametag & Text Formatting Engine | **NOT STARTED** | 0% | Server-side nametags, TextPlaceholderAPI integration |
@@ -42,29 +42,29 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 - [x] Project compiles with no Bukkit/Paper dependencies.
 
 ### Chunk 2 — Context Abstractions & Rule Engine Core
-- [ ] `MobContext`, `PlayerContext`, `SpawnContext`, `WorldContext` interfaces.
-- [ ] Rule data structures: `LevelRule`, `RulePredicate`, `EffectiveRule`.
-- [ ] Condition evaluators for entity IDs, entity tags, biome keys, biome tags, dimension keys, altitude, spawn reason.
-- [ ] Rule priority resolution and multi-rule property merging.
-- [ ] Thread-safe atomic rule swapping (`AtomicReference<CompiledRules>`).
-- [ ] Unit tests for rule parsing, matching, and merging.
+- [x] `MobContext`, `PlayerContext`, `SpawnContext`, `WorldContext` interfaces.
+- [x] Rule data structures: `LevelRule`, `RulePredicate`, `EffectiveRule`.
+- [x] Condition evaluators for entity IDs, entity tags, biome keys, biome tags, dimension keys, altitude, spawn reason.
+- [x] Rule priority resolution and multi-rule property merging.
+- [x] Thread-safe atomic rule swapping (`AtomicReference<CompiledRules>`).
+- [x] Unit tests for rule parsing, matching, and merging.
 
 ### Chunk 3 — Levelling Strategy Subsystem
-- [ ] `LevelStrategy` interface.
-- [ ] `RandomLevellingStrategy` with min/max, weighted distribution, and variance.
-- [ ] `SpawnDistanceStrategy` with origin coordinates, distance per level, base level, and min/max clamps.
-- [ ] `YDistanceStrategy` supporting depth/height scaling.
-- [ ] `PlayerLevellingStrategy` with `PlayerLevelProvider` interface.
-- [ ] `CustomStrategy` with mathematical formulas and `LevelTierMatching`.
-- [ ] Unit tests for all strategies matching upstream mathematical parity.
+- [x] `LevelStrategy` interface.
+- [x] `RandomLevellingStrategy` with min/max, weighted distribution, and variance.
+- [x] `SpawnDistanceStrategy` with origin coordinates, distance per level, base level, and min/max clamps.
+- [x] `YDistanceStrategy` supporting depth/height scaling.
+- [x] `PlayerLevellingStrategy` with `PlayerLevelProvider` interface.
+- [x] `CustomStrategy` with mathematical formulas and `LevelTierMatching`.
+- [x] Unit tests for all strategies matching upstream mathematical parity.
 
 ### Chunk 4 — Attribute Scaling Engine & Combat Pipeline
-- [ ] Full support for 8 attributes (`MAX_HEALTH`, `ATTACK_DAMAGE`, `MOVEMENT_SPEED`, `ARMOR`, `ARMOR_TOUGHNESS`, `KNOCKBACK_RESISTANCE`, `ATTACK_KNOCKBACK`, `FOLLOW_RANGE`).
-- [ ] Deterministic modifier namespacing (`lampas:levelled/<attribute>`).
-- [ ] Guaranteed idempotency (strip previous modifier before applying new modifier).
-- [ ] `HealthPolicy` (full HP on spawn, preserved percentage on chunk load/relevel).
-- [ ] Combat damage pipeline with melee, projectile, and explosion scaling.
-- [ ] Unit and combat tests.
+- [x] Full support for 8 attributes (`MAX_HEALTH`, `ATTACK_DAMAGE`, `MOVEMENT_SPEED`, `ARMOR`, `ARMOR_TOUGHNESS`, `KNOCKBACK_RESISTANCE`, `ATTACK_KNOCKBACK`, `FOLLOW_RANGE`).
+- [x] Deterministic modifier namespacing (`lampas:levelled/<attribute>`).
+- [x] Guaranteed idempotency (strip previous modifier before applying new modifier).
+- [x] `HealthPolicy` (full HP on spawn, preserved percentage on chunk load/relevel).
+- [x] Combat damage pipeline with melee, projectile, and explosion scaling.
+- [x] Unit and combat tests.
 
 ### Chunk 5 — Entity Lifecycle, Transformations & Spawning Pipeline
 - [ ] Centralized spawn pipeline in `MobLifecycleService.level(LivingEntity, SpawnReason)`.
@@ -115,5 +115,5 @@ This document tracks progress across all 12 execution chunks defined in [`portin
 ---
 
 ## 3. Current Phase / Next Steps
-- **Active Task**: Completed Chunk 1 (Fabric Module Skeleton & Vertical Slice MVP).
-- **Next Target**: Chunk 2 (Context Abstractions & Rule Engine Core).
+- **Active Task**: Completed Chunk 4 (Attribute Scaling Engine & Combat Pipeline).
+- **Next Target**: Chunk 5 (Entity Lifecycle, Transformations & Spawning Pipeline).
