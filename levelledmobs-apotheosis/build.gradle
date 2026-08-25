@@ -1,0 +1,95 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.19'
+    id 'maven-publish'
+}
+
+base {
+    archivesName = "levelledmobs-apotheosis"
+    version = project.findProperty('mod_version') ?: '1.0.0'
+    group = 'lampas.levelledmobs'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+def apotheosisVersion = project.findProperty('apotheosis_version') ?: '26.2-10.0.0'
+def apotheosisFabricJar = rootProject.file(
+    project.findProperty('apotheosis_fabric_jar') ?: '../Apotheosis/fabric/build/libs/Apotheosis-26.2-10.0.0.jar'
+)
+def expectedApotheosisFabricSha256 = String.valueOf(
+    project.findProperty('apotheosis_fabric_sha256') ?: ''
+).toUpperCase(Locale.ROOT)
+
+dependencies {
+    minecraft "com.mojang:minecraft:26.2"
+    implementation "net.fabricmc:fabric-loader:0.19.3"
+    compileOnly "net.fabricmc.fabric-api:fabric-api:0.152.1+26.2"
+    localRuntime "net.fabricmc.fabric-api:fabric-api:0.152.1+26.2"
+
+    // The addon compiles against the LevelledMobs API but never embeds it.
+    compileOnly project(':levelledmobs-fabric')
+    localRuntime project(':levelledmobs-fabric')
+
+    // The Maven-local Apotheosis coordinate is not loader-specific in this checkout and resolves
+    // to the NeoForge artifact. Use the exact sibling Fabric output instead; it remains external
+    // and is never included in the addon JAR.
+    compileOnly files(apotheosisFabricJar)
+    localRuntime files(apotheosisFabricJar)
+}
+
+def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
+    inputs.file(apotheosisFabricJar)
+    doLast {
+        if (!apotheosisFabricJar.isFile()) {
+            throw new GradleException(
+                "Missing Apotheosis Fabric JAR: ${apotheosisFabricJar}. " +
+                    "Build :fabric:assemble in the sibling Apotheosis repository or set apotheosis_fabric_jar."
+            )
+        }
+
+        def actualSha256 = java.security.MessageDigest.getInstance('SHA-256')
+            .digest(apotheosisFabricJar.bytes)
+            .collect { String.format('%02X', it & 0xFF) }
+            .join()
+        if (!expectedApotheosisFabricSha256.isEmpty() && actualSha256 != expectedApotheosisFabricSha256) {
+            throw new GradleException(
+                "Apotheosis Fabric JAR SHA-256 mismatch for ${apotheosisFabricJar}: " +
+                    "expected ${expectedApotheosisFabricSha256}, got ${actualSha256}."
+            )
+        }
+
+        def entries = new java.util.jar.JarFile(apotheosisFabricJar).withCloseable { jar ->
+            [fabric: jar.getEntry('fabric.mod.json') != null, neoforge: jar.getEntry('META-INF/neoforge.mods.toml') != null]
+        }
+        if (!entries.fabric || entries.neoforge) {
+            throw new GradleException(
+                "${apotheosisFabricJar} is not the expected Fabric Apotheosis artifact."
+            )
+        }
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn verifyApotheosisFabricJar
+}
+
+processResources {
+    inputs.property 'version', project.version
+
+    filesMatching('fabric.mod.json') {
+        expand version: project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}

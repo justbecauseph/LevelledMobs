@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "levelledmobs-apotheosis",
+  "version": "${version}",
+  "name": "LevelledMobs: Apotheosis Integration",
+  "description": "Applies LevelledMobs mob levels from Apotheosis World Tiers.",
+  "authors": [
+    "Lampas Team"
+  ],
+  "contact": {
+    "sources": "https://github.com/justbecauseph/LevelledMobs"
+  },
+  "license": "GPL-3.0-or-later",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "lampas.levelledmobs.apotheosis.ApotheosisLevelledMobsAddon"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "fabric-api": "*",
+    "lampas-levelledmobs": ">=1.0.0 <2.0.0",
+    "apotheosis": ">=10.0.0 <11.0.0"
+  }
+}
