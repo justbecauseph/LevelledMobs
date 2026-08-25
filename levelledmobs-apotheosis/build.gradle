@@ -11,12 +11,16 @@ base {
 
 repositories {
     mavenCentral()
-    mavenLocal()
 }
 
-def apotheosisVersion = project.findProperty('apotheosis_version') ?: '26.2-10.0.0'
+def apotheosisVersion = String.valueOf(
+    project.findProperty('apotheosis_version') ?: '26.2-10.0.0'
+)
+def apotheosisModVersion = apotheosisVersion.contains('-')
+    ? apotheosisVersion.substring(apotheosisVersion.indexOf('-') + 1)
+    : apotheosisVersion
 def apotheosisFabricJar = rootProject.file(
-    project.findProperty('apotheosis_fabric_jar') ?: '../Apotheosis/fabric/build/libs/Apotheosis-26.2-10.0.0.jar'
+    project.findProperty('apotheosis_fabric_jar') ?: "../Apotheosis/fabric/build/libs/Apotheosis-${apotheosisVersion}.jar"
 )
 def expectedApotheosisFabricSha256 = String.valueOf(
     project.findProperty('apotheosis_fabric_sha256') ?: ''
@@ -32,15 +36,18 @@ dependencies {
     compileOnly project(':levelledmobs-fabric')
     localRuntime project(':levelledmobs-fabric')
 
-    // The Maven-local Apotheosis coordinate is not loader-specific in this checkout and resolves
-    // to the NeoForge artifact. Use the exact sibling Fabric output instead; it remains external
-    // and is never included in the addon JAR.
+    // The sibling repository does not publish a loader-specific Maven coordinate in this checkout.
+    // Consume the exact Fabric output instead; it remains external and is never included in the
+    // addon JAR.
     compileOnly files(apotheosisFabricJar)
     localRuntime files(apotheosisFabricJar)
 }
 
 def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
     inputs.file(apotheosisFabricJar)
+    inputs.property('apotheosisVersion', apotheosisVersion)
+    inputs.property('apotheosisModVersion', apotheosisModVersion)
+    inputs.property('expectedApotheosisFabricSha256', expectedApotheosisFabricSha256)
     doLast {
         if (!apotheosisFabricJar.isFile()) {
             throw new GradleException(
@@ -60,12 +67,23 @@ def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
             )
         }
 
-        def entries = new java.util.jar.JarFile(apotheosisFabricJar).withCloseable { jar ->
-            [fabric: jar.getEntry('fabric.mod.json') != null, neoforge: jar.getEntry('META-INF/neoforge.mods.toml') != null]
+        def artifactMetadata = new java.util.jar.JarFile(apotheosisFabricJar).withCloseable { jar ->
+            def fabricModEntry = jar.getEntry('fabric.mod.json')
+            def fabricMod = fabricModEntry == null ? null : jar.getInputStream(fabricModEntry).withCloseable { stream ->
+                new groovy.json.JsonSlurper().parse(stream)
+            }
+            [
+                fabric: fabricModEntry != null,
+                neoforge: jar.getEntry('META-INF/neoforge.mods.toml') != null,
+                id: fabricMod?.id,
+                version: fabricMod?.version
+            ]
         }
-        if (!entries.fabric || entries.neoforge) {
+        if (!artifactMetadata.fabric || artifactMetadata.neoforge ||
+            artifactMetadata.id != 'apotheosis' || artifactMetadata.version != apotheosisModVersion) {
             throw new GradleException(
-                "${apotheosisFabricJar} is not the expected Fabric Apotheosis artifact."
+                "${apotheosisFabricJar} is not the expected Fabric Apotheosis artifact " +
+                    "(${apotheosisVersion}, mod version ${apotheosisModVersion})."
             )
         }
     }
@@ -91,5 +109,8 @@ tasks.withType(JavaCompile).configureEach {
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
     withSourcesJar()
 }
