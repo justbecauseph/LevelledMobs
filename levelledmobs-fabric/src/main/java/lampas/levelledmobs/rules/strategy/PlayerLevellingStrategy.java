@@ -20,8 +20,33 @@ public class PlayerLevellingStrategy implements LevelStrategy {
 
     private final PlayerLevelProvider provider;
 
+    public record CompiledPlayerConfig(
+        String variable,
+        float scale,
+        boolean matchVariable,
+        boolean variableAsMax,
+        List<LevelTierMatching> tiers,
+        Integer outputCap,
+        int variance
+    ) {}
+
     public PlayerLevellingStrategy(PlayerLevelProvider provider) {
         this.provider = (provider != null) ? provider : PlayerLevelProvider.VANILLA;
+    }
+
+    public static CompiledPlayerConfig compileConfig(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) {
+            return new CompiledPlayerConfig("%level%", 1.0f, false, false, List.of(), null, 0);
+        }
+        String variable = getString(config.get("variable"), "%level%");
+        float scale = (float) getDouble(config.get("player_variable_scale"), 1.0);
+        boolean matchVariable = getBoolean(config.get("match_variable"), false);
+        boolean variableAsMax = getBoolean(config.get("variable_as_max"), false);
+        List<LevelTierMatching> tiers = parseTiers(config.get("level_tiers"));
+        Integer outputCap = config.containsKey("output_cap") ? getInt(config.get("output_cap"), Integer.MAX_VALUE) : null;
+        int variance = getInt(config.get("variance"), 0);
+
+        return new CompiledPlayerConfig(variable, scale, matchVariable, variableAsMax, List.copyOf(tiers), outputCap, variance);
     }
 
     @Override
@@ -31,31 +56,28 @@ public class PlayerLevellingStrategy implements LevelStrategy {
 
     @Override
     public int calculateLevel(MobContext context, EffectiveRule rule) {
-        Map<String, Object> config = rule.strategyConfig();
-
-        ServerPlayer player = context.nearestPlayer().orElse(null);
+        ServerPlayer player = (context != null) ? context.nearestPlayer().orElse(null) : null;
         if (player == null) {
-            return rule.levelRange().min();
+            return (rule != null) ? rule.levelRange().min() : 1;
         }
 
-        String variable = getString(config.get("variable"), "%level%");
-        float scale = (float) getDouble(config.get("player_variable_scale"), 1.0);
-        float rawPlayerLevel = provider.getPlayerLevel(player, variable);
-        float scaledPlayerLevel = Math.max(0f, rawPlayerLevel * scale);
+        CompiledPlayerConfig compiled = (rule != null && rule.compiledStrategyConfig() instanceof CompiledPlayerConfig c)
+            ? c
+            : compileConfig(rule != null ? rule.strategyConfig() : Map.of());
 
-        boolean matchVariable = getBoolean(config.get("match_variable"), false);
-        boolean variableAsMax = getBoolean(config.get("variable_as_max"), false);
+        float rawPlayerLevel = provider.getPlayerLevel(player, compiled.variable());
+        float scaledPlayerLevel = Math.max(0f, rawPlayerLevel * compiled.scale());
 
         int level;
-        if (matchVariable) {
+        if (compiled.matchVariable()) {
             level = Math.round(scaledPlayerLevel);
-        } else if (variableAsMax) {
-            int max = Math.max(rule.levelRange().min(), Math.round(scaledPlayerLevel));
-            level = ThreadLocalRandom.current().nextInt(rule.levelRange().min(), max + 1);
+        } else if (compiled.variableAsMax()) {
+            int minL = (rule != null) ? rule.levelRange().min() : 1;
+            int max = Math.max(minL, Math.round(scaledPlayerLevel));
+            level = ThreadLocalRandom.current().nextInt(minL, max + 1);
         } else {
-            List<LevelTierMatching> tiers = parseTiers(config.get("level_tiers"));
             LevelTierMatching matchedTier = null;
-            for (LevelTierMatching tier : tiers) {
+            for (LevelTierMatching tier : compiled.tiers()) {
                 if (tier.matches(scaledPlayerLevel, null)) {
                     matchedTier = tier;
                     break;
@@ -72,22 +94,19 @@ public class PlayerLevellingStrategy implements LevelStrategy {
         }
 
         // Apply output cap if set
-        if (config.containsKey("output_cap")) {
-            int cap = getInt(config.get("output_cap"), Integer.MAX_VALUE);
-            level = Math.min(level, cap);
+        if (compiled.outputCap() != null) {
+            level = Math.min(level, compiled.outputCap());
         }
 
         // Apply variance
-        int variance = getInt(config.get("variance"), 0);
-        if (variance > 0) {
-            level += RandomVarianceGenerator.generateVariance(variance, true);
+        if (compiled.variance() > 0) {
+            level += RandomVarianceGenerator.generateVariance(compiled.variance(), true);
         }
 
-        return rule.levelRange().clamp(level);
+        return (rule != null) ? rule.levelRange().clamp(level) : level;
     }
 
-    @SuppressWarnings("unchecked")
-    private List<LevelTierMatching> parseTiers(Object obj) {
+    private static List<LevelTierMatching> parseTiers(Object obj) {
         if (!(obj instanceof List<?> list)) {
             return List.of();
         }

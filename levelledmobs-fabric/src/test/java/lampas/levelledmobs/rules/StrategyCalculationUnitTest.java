@@ -228,4 +228,136 @@ public class StrategyCalculationUnitTest {
         assertNull(MinAndMax.parse("invalid-string-here"));
         assertNull(MinAndMax.parse(""));
     }
+
+    @Test
+    public void testStrategyPreCompilationEquivalence() {
+        // 1. RANDOM compilation
+        Map<String, Object> randomConfig = Map.of(
+            "weighted", Map.of("1-5", 10, "6-10", 20),
+            "variance", 2
+        );
+        RandomLevellingStrategy.CompiledRandomConfig compiledRandom = RandomLevellingStrategy.compileConfig(randomConfig);
+        assertEquals(2, compiledRandom.entries().size());
+        assertEquals(30, compiledRandom.totalWeight());
+        assertEquals(2, compiledRandom.variance());
+
+        // 2. SPAWN_DISTANCE compilation with comma-separated origin
+        Map<String, Object> spawnDistConfig = Map.of(
+            "origin", "100.5, 64.0, -200.5",
+            "buffer_distance", 50.0,
+            "distance_per_level", 25.0,
+            "base_level", 3,
+            "variance", 1
+        );
+        SpawnDistanceStrategy.CompiledSpawnDistanceConfig compiledSpawn = SpawnDistanceStrategy.compileConfig(spawnDistConfig);
+        assertEquals(100.5, compiledSpawn.originX(), 0.001);
+        assertEquals(-200.5, compiledSpawn.originZ(), 0.001);
+        assertEquals(50.0, compiledSpawn.bufferDistance(), 0.001);
+        assertEquals(25.0, compiledSpawn.distancePerLevel(), 0.001);
+        assertEquals(3, compiledSpawn.baseLevel());
+        assertEquals(1, compiledSpawn.variance());
+
+        // 3. Y_DISTANCE compilation
+        Map<String, Object> yDistConfig = Map.of(
+            "starting_y", 120,
+            "ending_y", 0,
+            "increase_per_level", 10.0,
+            "scale_downward", true,
+            "variance", 0
+        );
+        YDistanceStrategy.CompiledYDistanceConfig compiledY = YDistanceStrategy.compileConfig(yDistConfig);
+        assertEquals(120, compiledY.startY());
+        assertEquals(0, compiledY.endY());
+        assertTrue(compiledY.isDescending());
+        assertEquals(10.0, compiledY.increasePerLevel(), 0.001);
+        assertEquals(0, compiledY.variance());
+
+        // 4. PLAYER compilation
+        Map<String, Object> playerConfig = Map.of(
+            "variable", "%custom_stat%",
+            "player_variable_scale", 1.5,
+            "match_variable", true,
+            "output_cap", 50,
+            "variance", 3
+        );
+        PlayerLevellingStrategy.CompiledPlayerConfig compiledPlayer = PlayerLevellingStrategy.compileConfig(playerConfig);
+        assertEquals("%custom_stat%", compiledPlayer.variable());
+        assertEquals(1.5f, compiledPlayer.scale(), 0.001f);
+        assertTrue(compiledPlayer.matchVariable());
+        assertEquals(50, compiledPlayer.outputCap());
+        assertEquals(3, compiledPlayer.variance());
+    }
+
+    private static class InstrumentedCountingContext extends StrategyMockContext {
+        private int nearestPlayerInvocations = 0;
+
+        public InstrumentedCountingContext(BlockPos pos, ServerPlayer player) {
+            super(pos, player);
+        }
+
+        @Override
+        public Optional<ServerPlayer> nearestPlayer() {
+            nearestPlayerInvocations++;
+            return super.nearestPlayer();
+        }
+
+        public int getNearestPlayerInvocations() {
+            return nearestPlayerInvocations;
+        }
+    }
+
+    @Test
+    public void testPlayerLevellingStrategySingleNearestPlayerScan() {
+        PlayerLevelProvider mockProvider = (player, varName) -> 20.0f;
+        PlayerLevellingStrategy strategy = new PlayerLevellingStrategy(mockProvider);
+
+        LevelRule rule = LevelRule.builder("player_scan_test")
+            .levelRange(IntRange.of(1, 50))
+            .strategy("PLAYER", Map.of("match_variable", true))
+            .build();
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+
+        // 1. Context with player present
+        // Since ServerPlayer requires bootstrap, we can pass null or instrument context with empty/present
+        InstrumentedCountingContext emptyContext = new InstrumentedCountingContext(new BlockPos(0, 64, 0), null);
+        int levelEmpty = strategy.calculateLevel(emptyContext, effective);
+        assertEquals(1, levelEmpty);
+        assertEquals(1, emptyContext.getNearestPlayerInvocations(), "nearestPlayer() must be called exactly once when empty");
+    }
+
+    @Test
+    public void testSpawnDistanceBaseLevelFallbackToRuleMin() {
+        // 1. Rule with min = 5 and missing base_level
+        LevelRule ruleMissing = LevelRule.builder("dist_fallback_missing")
+            .levelRange(IntRange.of(5, 50))
+            .strategy("SPAWN_DISTANCE", Map.of(
+                "distance_per_level", 100.0
+            ))
+            .build();
+        EffectiveRule effMissing = EffectiveRule.merge(List.of(ruleMissing));
+        MobContext ctxAtOrigin = new StrategyMockContext(new BlockPos(0, 64, 0), null);
+        assertEquals(5, SpawnDistanceStrategy.INSTANCE.calculateLevel(ctxAtOrigin, effMissing));
+
+        // 2. Rule with min = 5 and unparsable base_level string
+        LevelRule ruleInvalid = LevelRule.builder("dist_fallback_invalid")
+            .levelRange(IntRange.of(5, 50))
+            .strategy("SPAWN_DISTANCE", Map.of(
+                "base_level", "not_a_number",
+                "distance_per_level", 100.0
+            ))
+            .build();
+        EffectiveRule effInvalid = EffectiveRule.merge(List.of(ruleInvalid));
+        assertEquals(5, SpawnDistanceStrategy.INSTANCE.calculateLevel(ctxAtOrigin, effInvalid));
+
+        // 3. Rule with min = 5 and explicit valid base_level = 15
+        LevelRule ruleExplicit = LevelRule.builder("dist_explicit")
+            .levelRange(IntRange.of(5, 50))
+            .strategy("SPAWN_DISTANCE", Map.of(
+                "base_level", 15,
+                "distance_per_level", 100.0
+            ))
+            .build();
+        EffectiveRule effExplicit = EffectiveRule.merge(List.of(ruleExplicit));
+        assertEquals(15, SpawnDistanceStrategy.INSTANCE.calculateLevel(ctxAtOrigin, effExplicit));
+    }
 }

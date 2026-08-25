@@ -38,16 +38,25 @@ public class NametagService {
         }
 
         if (visibility == NametagVisibility.NEVER) {
-            entity.setCustomName(null);
-            entity.setCustomNameVisible(false);
+            if (entity.getCustomName() != null) {
+                entity.setCustomName(null);
+            }
+            if (entity.isCustomNameVisible()) {
+                entity.setCustomNameVisible(false);
+            }
             return;
         }
 
         try {
             Component nameComponent = template.render(entity, level, ruleSet);
-            entity.setCustomName(nameComponent);
+            if (!java.util.Objects.equals(entity.getCustomName(), nameComponent)) {
+                entity.setCustomName(nameComponent);
+            }
             // If ALWAYS, nametag is visible through blocks. If HOVER_ONLY, it only renders when aimed at in direct line of sight.
-            entity.setCustomNameVisible(visibility == NametagVisibility.ALWAYS);
+            boolean desiredVisible = (visibility == NametagVisibility.ALWAYS);
+            if (entity.isCustomNameVisible() != desiredVisible) {
+                entity.setCustomNameVisible(desiredVisible);
+            }
         } catch (Exception e) {
             LOGGER.error("Failed to format nametag for entity {} (UUID: {})",
                 entity.getType().getDescription().getString(), entity.getUUID(), e);

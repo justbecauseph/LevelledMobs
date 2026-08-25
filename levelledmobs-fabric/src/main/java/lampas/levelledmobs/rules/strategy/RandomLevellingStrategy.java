@@ -16,6 +16,44 @@ import java.util.concurrent.ThreadLocalRandom;
 public class RandomLevellingStrategy implements LevelStrategy {
     public static final RandomLevellingStrategy INSTANCE = new RandomLevellingStrategy();
 
+    public record CompiledRandomConfig(
+        List<WeightedEntry> entries,
+        int totalWeight,
+        int variance
+    ) {
+        public record WeightedEntry(int min, int max, int weight) {}
+    }
+
+    public static CompiledRandomConfig compileConfig(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) {
+            return new CompiledRandomConfig(List.of(), 0, 0);
+        }
+
+        Object weightedObj = config.get("weighted");
+        if (weightedObj == null) weightedObj = config.get("weights");
+        if (weightedObj == null) weightedObj = config.get("weighted_random");
+
+        List<CompiledRandomConfig.WeightedEntry> entries = new ArrayList<>();
+        int totalWeight = 0;
+
+        if (weightedObj instanceof Map<?, ?> weightMap && !weightMap.isEmpty()) {
+            for (Map.Entry<?, ?> entry : weightMap.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                int weight = getInt(entry.getValue(), 1);
+                if (weight <= 0) continue;
+
+                MinAndMax range = MinAndMax.parse(key);
+                if (range != null) {
+                    entries.add(new CompiledRandomConfig.WeightedEntry(range.minAsInt(), range.maxAsInt(), weight));
+                    totalWeight += weight;
+                }
+            }
+        }
+
+        int variance = getInt(config.get("variance"), 0);
+        return new CompiledRandomConfig(List.copyOf(entries), totalWeight, variance);
+    }
+
     @Override
     public String name() {
         return "RANDOM";
@@ -23,69 +61,42 @@ public class RandomLevellingStrategy implements LevelStrategy {
 
     @Override
     public int calculateLevel(MobContext context, EffectiveRule rule) {
-        int minLevel = rule.levelRange().min();
-        int maxLevel = rule.levelRange().max();
+        int minLevel = rule != null ? rule.levelRange().min() : 1;
+        int maxLevel = rule != null ? rule.levelRange().max() : 1;
 
         if (minLevel >= maxLevel) {
             return minLevel;
         }
 
-        Map<String, Object> config = rule.strategyConfig();
+        CompiledRandomConfig compiled = (rule != null && rule.compiledStrategyConfig() instanceof CompiledRandomConfig c)
+            ? c
+            : compileConfig(rule != null ? rule.strategyConfig() : Map.of());
+
         int level;
-
-        Object weightedObj = config.get("weighted");
-        if (weightedObj == null) weightedObj = config.get("weights");
-        if (weightedObj == null) weightedObj = config.get("weighted_random");
-
-        if (weightedObj instanceof Map<?, ?> weightMap && !weightMap.isEmpty()) {
-            level = sampleWeighted(weightMap, minLevel, maxLevel);
+        if (!compiled.entries().isEmpty() && compiled.totalWeight() > 0) {
+            int roll = ThreadLocalRandom.current().nextInt(0, compiled.totalWeight());
+            int cursor = 0;
+            int sampled = minLevel;
+            for (CompiledRandomConfig.WeightedEntry entry : compiled.entries()) {
+                cursor += entry.weight();
+                if (roll < cursor) {
+                    int min = Math.max(minLevel, entry.min());
+                    int max = Math.min(maxLevel, entry.max());
+                    sampled = (min >= max) ? min : ThreadLocalRandom.current().nextInt(min, max + 1);
+                    break;
+                }
+            }
+            level = sampled;
         } else {
             level = ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
         }
 
         // Apply variance
-        int variance = getInt(config.get("variance"), 0);
-        if (variance > 0) {
-            level += RandomVarianceGenerator.generateVariance(variance, true);
+        if (compiled.variance() > 0) {
+            level += RandomVarianceGenerator.generateVariance(compiled.variance(), true);
         }
 
-        return rule.levelRange().clamp(level);
-    }
-
-    private int sampleWeighted(Map<?, ?> weightMap, int minLevel, int maxLevel) {
-        List<WeightedEntry> entries = new ArrayList<>();
-        int totalWeight = 0;
-
-        for (Map.Entry<?, ?> entry : weightMap.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            int weight = getInt(entry.getValue(), 1);
-            if (weight <= 0) continue;
-
-            MinAndMax range = MinAndMax.parse(key);
-            if (range != null) {
-                entries.add(new WeightedEntry(range.minAsInt(), range.maxAsInt(), weight));
-                totalWeight += weight;
-            }
-        }
-
-        if (entries.isEmpty() || totalWeight <= 0) {
-            return ThreadLocalRandom.current().nextInt(minLevel, maxLevel + 1);
-        }
-
-        int roll = ThreadLocalRandom.current().nextInt(0, totalWeight);
-        int cursor = 0;
-
-        for (WeightedEntry entry : entries) {
-            cursor += entry.weight;
-            if (roll < cursor) {
-                int min = Math.max(minLevel, entry.min);
-                int max = Math.min(maxLevel, entry.max);
-                if (min >= max) return min;
-                return ThreadLocalRandom.current().nextInt(min, max + 1);
-            }
-        }
-
-        return minLevel;
+        return rule != null ? rule.levelRange().clamp(level) : level;
     }
 
     private static int getInt(Object obj, int def) {
@@ -95,6 +106,4 @@ public class RandomLevellingStrategy implements LevelStrategy {
         }
         return def;
     }
-
-    private record WeightedEntry(int min, int max, int weight) {}
 }

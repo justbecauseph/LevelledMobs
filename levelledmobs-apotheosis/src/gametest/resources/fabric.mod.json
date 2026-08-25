@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "levelledmobs-apotheosis-gametest",
+  "version": "1.0.0",
+  "name": "LevelledMobs Apotheosis Game Tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "lampas.levelledmobs.apotheosis.gametest.ApotheosisWorldTierGameTests"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "fabric-api": "*",
+    "levelledmobs-apotheosis": "*",
+    "lampas-levelledmobs": "*",
+    "apotheosis": "*"
+  }
+}

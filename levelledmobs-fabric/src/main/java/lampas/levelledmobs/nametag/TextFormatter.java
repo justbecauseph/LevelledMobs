@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
  * High-performance text formatting engine supporting colors, hex (#RRGGBB), legacy codes (& / §), and tag syntax (<color>).
  */
 public class TextFormatter {
+    public static final Pattern TAG_PATTERN = Pattern.compile("<(/?[#a-zA-Z0-9_]+)>");
 
     /**
      * Formats a raw text string with legacy or tag-based styling into a Minecraft Component.
@@ -29,25 +30,42 @@ public class TextFormatter {
     }
 
     public static String translateLegacy(String text) {
-        if (text == null) return "";
-        return text
-            .replace("&0", "<black>").replace("§0", "<black>")
-            .replace("&1", "<dark_blue>").replace("§1", "<dark_blue>")
-            .replace("&2", "<dark_green>").replace("§2", "<dark_green>")
-            .replace("&3", "<dark_aqua>").replace("§3", "<dark_aqua>")
-            .replace("&4", "<dark_red>").replace("§4", "<dark_red>")
-            .replace("&5", "<dark_purple>").replace("§5", "<dark_purple>")
-            .replace("&6", "<gold>").replace("§6", "<gold>")
-            .replace("&7", "<gray>").replace("§7", "<gray>")
-            .replace("&8", "<dark_gray>").replace("§8", "<dark_gray>")
-            .replace("&9", "<blue>").replace("§9", "<blue>")
-            .replace("&a", "<green>").replace("§a", "<green>")
-            .replace("&b", "<aqua>").replace("§b", "<aqua>")
-            .replace("&c", "<red>").replace("§c", "<red>")
-            .replace("&d", "<light_purple>").replace("§d", "<light_purple>")
-            .replace("&e", "<yellow>").replace("§e", "<yellow>")
-            .replace("&f", "<white>").replace("§f", "<white>")
-            .replace("&r", "<reset>").replace("§r", "<reset>");
+        if (text == null || text.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder(text.length() + 16);
+        int len = text.length();
+        for (int i = 0; i < len; i++) {
+            char c = text.charAt(i);
+            if ((c == '&' || c == '§') && i + 1 < len) {
+                char code = Character.toLowerCase(text.charAt(i + 1));
+                String tag = switch (code) {
+                    case '0' -> "<black>";
+                    case '1' -> "<dark_blue>";
+                    case '2' -> "<dark_green>";
+                    case '3' -> "<dark_aqua>";
+                    case '4' -> "<dark_red>";
+                    case '5' -> "<dark_purple>";
+                    case '6' -> "<gold>";
+                    case '7' -> "<gray>";
+                    case '8' -> "<dark_gray>";
+                    case '9' -> "<blue>";
+                    case 'a' -> "<green>";
+                    case 'b' -> "<aqua>";
+                    case 'c' -> "<red>";
+                    case 'd' -> "<light_purple>";
+                    case 'e' -> "<yellow>";
+                    case 'f' -> "<white>";
+                    case 'r' -> "<reset>";
+                    default -> null;
+                };
+                if (tag != null) {
+                    sb.append(tag);
+                    i++; // skip code character
+                    continue;
+                }
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     public static Component parseTags(String text) {
@@ -55,7 +73,7 @@ public class TextFormatter {
         int lastIndex = 0;
         TextColor currentColor = null;
 
-        Matcher matcher = Pattern.compile("<(/?[#a-zA-Z0-9_]+)>").matcher(text);
+        Matcher matcher = TAG_PATTERN.matcher(text);
 
         while (matcher.find()) {
             int start = matcher.start();
@@ -89,7 +107,8 @@ public class TextFormatter {
         return root;
     }
 
-    private static TextColor resolveColor(String tag) {
+    public static TextColor resolveColor(String tag) {
+        if (tag == null || tag.isEmpty()) return null;
         if (tag.startsWith("#")) {
             return TextColor.parseColor(tag).result().orElse(null);
         }

@@ -223,4 +223,35 @@ public class RuleEngineUnitTest {
         MobContext nonMatching = new TestMobContext(Identifier.fromNamespaceAndPath("minecraft", "wither"), OVERWORLD, new BlockPos(0, 10, 0), SpawnReason.NATURAL);
         assertFalse(rule.matches(nonMatching));
     }
+
+    @Test
+    public void testAltitudeCacheCorrectnessInSameBucket() {
+        RuleManager manager = new RuleManager();
+        Identifier zombieId = Identifier.fromNamespaceAndPath("minecraft", "zombie");
+
+        // Rule matches Y <= 62
+        LevelRule lowAltitudeRule = LevelRule.builder("low_altitude_rule")
+            .priority(50)
+            .levelRange(IntRange.of(20, 30))
+            .condition(AltitudeCondition.below(62))
+            .build();
+
+        manager.setRules(List.of(lowAltitudeRule));
+
+        // Two Y coordinates in the same former 16-block bucket (60 >> 4 == 3 and 63 >> 4 == 3)
+        MobContext y60Context = new TestMobContext(zombieId, OVERWORLD, new BlockPos(0, 60, 0), SpawnReason.NATURAL);
+        MobContext y63Context = new TestMobContext(zombieId, OVERWORLD, new BlockPos(0, 63, 0), SpawnReason.NATURAL);
+
+        // First resolution caches Y=60
+        RuleResult result60 = manager.resolve(y60Context);
+        assertTrue(result60.matched());
+        assertEquals("low_altitude_rule", result60.effectiveRule().primaryRuleId());
+        assertEquals(20, result60.effectiveRule().levelRange().min());
+
+        // Second resolution at Y=63 in the same former bucket must NOT return cached low_altitude_rule
+        RuleResult result63 = manager.resolve(y63Context);
+        // Y=63 is above 62, so low_altitude_rule does not match, falling back to default
+        assertFalse(result63.matched());
+        assertEquals("default", result63.effectiveRule().primaryRuleId());
+    }
 }

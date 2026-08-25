@@ -13,7 +13,7 @@ public record RuleCacheKey(
     Identifier dimensionId,
     Identifier biomeId,
     SpawnReason spawnReason,
-    int altitudeBucket
+    int altitude
 ) {
     public static RuleCacheKey from(MobContext context) {
         Identifier entityId = context.entityId();
@@ -25,8 +25,8 @@ public record RuleCacheKey(
                 .orElse(null);
         }
         SpawnReason reason = context.spawnReason();
-        int yBucket = context.blockPos() != null ? (context.blockPos().getY() >> 4) : 0; // 16-block chunk vertical sub-slices
+        int altitude = context.blockPos() != null ? context.blockPos().getY() : 0;
 
-        return new RuleCacheKey(entityId, dimId, biomeId, reason, yBucket);
+        return new RuleCacheKey(entityId, dimId, biomeId, reason, altitude);
     }
 }

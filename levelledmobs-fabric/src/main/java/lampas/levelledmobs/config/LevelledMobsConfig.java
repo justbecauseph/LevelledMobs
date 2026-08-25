@@ -7,6 +7,7 @@ import lampas.levelledmobs.nametag.NametagVisibility;
  */
 public record LevelledMobsConfig(
     int maxMobsPerTick,
+    int maxProcessTimeMs,
     String nametagTemplate,
     NametagVisibility nametagVisibility,
     boolean allowBossLeveling,
@@ -14,8 +15,32 @@ public record LevelledMobsConfig(
     double defaultXpMultiplier,
     double defaultDropMultiplier
 ) {
+    public static final int DEFAULT_MAX_PROCESS_TIME_MS = 2;
+
+    public LevelledMobsConfig(
+        int maxMobsPerTick,
+        String nametagTemplate,
+        NametagVisibility nametagVisibility,
+        boolean allowBossLeveling,
+        boolean debug,
+        double defaultXpMultiplier,
+        double defaultDropMultiplier
+    ) {
+        this(
+            maxMobsPerTick,
+            DEFAULT_MAX_PROCESS_TIME_MS,
+            nametagTemplate,
+            nametagVisibility,
+            allowBossLeveling,
+            debug,
+            defaultXpMultiplier,
+            defaultDropMultiplier
+        );
+    }
+
     public static final LevelledMobsConfig DEFAULT = new LevelledMobsConfig(
         50,
+        DEFAULT_MAX_PROCESS_TIME_MS,
         "<gray>Lv. <yellow><level></yellow> <white><mob_name></white>",
         NametagVisibility.HOVER_ONLY,
         false,
@@ -23,6 +48,10 @@ public record LevelledMobsConfig(
         0.10,
         0.05
     );
+
+    public int effectiveMaxProcessTimeMs() {
+        return maxProcessTimeMs > 0 ? maxProcessTimeMs : DEFAULT_MAX_PROCESS_TIME_MS;
+    }
 
     public boolean nametagVisible() {
         return nametagVisibility == NametagVisibility.ALWAYS;

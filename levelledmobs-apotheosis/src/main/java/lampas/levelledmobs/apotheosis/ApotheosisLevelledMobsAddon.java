@@ -1,5 +1,6 @@
 package lampas.levelledmobs.apotheosis;
 
+import lampas.levelledmobs.rules.strategy.StrategyRegistry;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ public final class ApotheosisLevelledMobsAddon implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Initializing LevelledMobs Apotheosis integration...");
+        StrategyRegistry.INSTANCE.register(ApotheosisWorldTierStrategy.INSTANCE);
+        LOGGER.info("Registered LevelledMobs strategy '{}'.", ApotheosisWorldTierStrategy.NAME);
     }
 }

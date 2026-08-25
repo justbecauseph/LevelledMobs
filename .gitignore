@@ -23,5 +23,6 @@ build/
 # Local
 local/
 levelledmobs-fabric/logs
+levelledmobs-apotheosis/logs
 levelledmobs-fabric/run
 run/

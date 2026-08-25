@@ -11,8 +11,20 @@ base {
 
 repositories {
     mavenCentral()
+    maven {
+        url = 'https://maven.architectury.dev/'
+        content {
+            includeGroup 'dev.architectury'
+        }
+    }
 }
 
+def fabricApiVersion = String.valueOf(
+    project.findProperty('fabric_api_version') ?: '0.155.2+26.2'
+)
+def architecturyVersion = String.valueOf(
+    project.findProperty('architectury_version') ?: '21.0.7'
+)
 def apotheosisVersion = String.valueOf(
     project.findProperty('apotheosis_version') ?: '26.2-10.0.0'
 )
@@ -25,12 +37,41 @@ def apotheosisFabricJar = rootProject.file(
 def expectedApotheosisFabricSha256 = String.valueOf(
     project.findProperty('apotheosis_fabric_sha256') ?: ''
 ).toUpperCase(Locale.ROOT)
+def placeboVersion = String.valueOf(
+    project.findProperty('placebo_version') ?: '26.2-11.0.0'
+)
+def apothicAttributesVersion = String.valueOf(
+    project.findProperty('apothic_attributes_version') ?: '26.2-4.0.0'
+)
+def placeboModVersion = placeboVersion.contains('-')
+    ? placeboVersion.substring(placeboVersion.indexOf('-') + 1)
+    : placeboVersion
+def apothicAttributesModVersion = apothicAttributesVersion.contains('-')
+    ? apothicAttributesVersion.substring(apothicAttributesVersion.indexOf('-') + 1)
+    : apothicAttributesVersion
+def placeboFabricJar = rootProject.file(
+    project.findProperty('placebo_fabric_jar') ?: "../Placebo/fabric/build/libs/Placebo-${placeboVersion}.jar"
+)
+def apothicAttributesFabricJar = rootProject.file(
+    project.findProperty('apothic_attributes_fabric_jar') ?:
+        "../Apothic-Attributes/fabric/build/libs/ApothicAttributes-${apothicAttributesVersion}.jar"
+)
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'levelledmobs-apotheosis-gametest'
+        enableGameTests = true
+        enableClientGameTests = false
+        eula = true
+    }
+}
 
 dependencies {
     minecraft "com.mojang:minecraft:26.2"
     implementation "net.fabricmc:fabric-loader:0.19.3"
-    compileOnly "net.fabricmc.fabric-api:fabric-api:0.152.1+26.2"
-    localRuntime "net.fabricmc.fabric-api:fabric-api:0.152.1+26.2"
+    compileOnly "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+    localRuntime "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
 
     // The addon compiles against the LevelledMobs API but never embeds it.
     compileOnly project(':levelledmobs-fabric')
@@ -41,6 +82,21 @@ dependencies {
     // addon JAR.
     compileOnly files(apotheosisFabricJar)
     localRuntime files(apotheosisFabricJar)
+
+    // Runtime-only hard dependencies declared by Apotheosis' Fabric metadata. Local sibling
+    // outputs keep the GameTest on the same ported stack as the verified Apotheosis artifact.
+    localRuntime "dev.architectury:architectury-fabric:${architecturyVersion}"
+    localRuntime files(placeboFabricJar, apothicAttributesFabricJar)
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    testImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+    testImplementation project(':levelledmobs-fabric')
+    testImplementation files(apotheosisFabricJar)
+
+    gametestCompileOnly files(placeboFabricJar, apothicAttributesFabricJar)
+    gametestRuntimeOnly "dev.architectury:architectury-fabric:${architecturyVersion}"
+    gametestRuntimeOnly files(placeboFabricJar, apothicAttributesFabricJar)
 }
 
 def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
@@ -89,6 +145,35 @@ def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
     }
 }
 
+def verifyApotheosisGameTestRuntime = tasks.register('verifyApotheosisGameTestRuntime') {
+    inputs.files(placeboFabricJar, apothicAttributesFabricJar)
+    doLast {
+        [
+            [file: placeboFabricJar, id: 'placebo', version: placeboModVersion],
+            [file: apothicAttributesFabricJar, id: 'apothic_attributes', version: apothicAttributesModVersion]
+        ].each { artifact ->
+            if (!artifact.file.isFile()) {
+                throw new GradleException(
+                    "Missing ${artifact.id} Fabric JAR: ${artifact.file}. " +
+                        "Build the sibling Fabric project or override its *_fabric_jar property."
+                )
+            }
+
+            def metadata = new java.util.jar.JarFile(artifact.file).withCloseable { jar ->
+                def entry = jar.getEntry('fabric.mod.json')
+                entry == null ? null : jar.getInputStream(entry).withCloseable { stream ->
+                    new groovy.json.JsonSlurper().parse(stream)
+                }
+            }
+            if (metadata?.id != artifact.id || metadata?.version != artifact.version) {
+                throw new GradleException(
+                    "${artifact.file} is not the expected Fabric ${artifact.id} ${artifact.version} artifact."
+                )
+            }
+        }
+    }
+}
+
 tasks.named('compileJava') {
     dependsOn verifyApotheosisFabricJar
 }
@@ -113,4 +198,24 @@ java {
         languageVersion = JavaLanguageVersion.of(25)
     }
     withSourcesJar()
+}
+
+test {
+    dependsOn verifyApotheosisFabricJar
+    useJUnitPlatform()
+}
+
+def ownedGameTestName =
+    'levelledmobs-apotheosis-gametest:apotheosis_world_tier_game_tests_nearest_world_tier_drives_lifecycle_level_and_persists'
+def gameTestReportFile = layout.buildDirectory.file(
+    'test-results/gameTest/TEST-levelledmobs-apotheosis-gametest.xml'
+)
+
+tasks.named('runGameTest') {
+    dependsOn verifyApotheosisFabricJar, verifyApotheosisGameTestRuntime
+    systemProperty 'fabric-api.gametest.filter', ownedGameTestName
+    systemProperty 'fabric-api.gametest.report-file', gameTestReportFile.get().asFile.absolutePath
+    doFirst {
+        gameTestReportFile.get().asFile.parentFile.mkdirs()
+    }
 }

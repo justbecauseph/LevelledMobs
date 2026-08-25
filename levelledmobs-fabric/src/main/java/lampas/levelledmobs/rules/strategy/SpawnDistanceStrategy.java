@@ -13,15 +13,19 @@ import java.util.Map;
 public class SpawnDistanceStrategy implements LevelStrategy {
     public static final SpawnDistanceStrategy INSTANCE = new SpawnDistanceStrategy();
 
-    @Override
-    public String name() {
-        return "SPAWN_DISTANCE";
-    }
+    public record CompiledSpawnDistanceConfig(
+        double originX,
+        double originZ,
+        double bufferDistance,
+        double distancePerLevel,
+        Integer baseLevel,
+        int variance
+    ) {}
 
-    @Override
-    public int calculateLevel(MobContext context, EffectiveRule rule) {
-        Map<String, Object> config = rule.strategyConfig();
-
+    public static CompiledSpawnDistanceConfig compileConfig(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) {
+            return new CompiledSpawnDistanceConfig(0.0, 0.0, 0.0, 100.0, null, 0);
+        }
         double originX = getDouble(config.get("origin_x"), 0.0);
         double originZ = getDouble(config.get("origin_z"), 0.0);
         if (config.containsKey("origin") && config.get("origin") instanceof String str) {
@@ -34,38 +38,54 @@ public class SpawnDistanceStrategy implements LevelStrategy {
             }
         }
 
-        double mobX = 0.0;
-        double mobZ = 0.0;
-        if (context.blockPos() != null) {
-            mobX = context.blockPos().getX();
-            mobZ = context.blockPos().getZ();
-        } else if (context.position() != null) {
-            mobX = context.position().x;
-            mobZ = context.position().z;
-        }
-
-        double distance = Math.hypot(mobX - originX, mobZ - originZ);
         double bufferDistance = getDouble(config.get("buffer_distance"), 0.0);
         double distancePerLevel = getDouble(config.get("distance_per_level"), 100.0);
         if (distancePerLevel <= 0.0) {
             distancePerLevel = getDouble(config.get("ringed_tiers"), 100.0);
         }
         if (distancePerLevel <= 0.0) {
-            distancePerLevel = 100.0; // Prevent division by zero
+            distancePerLevel = 100.0;
         }
 
-        int baseLevel = getInt(config.get("base_level"), rule.levelRange().min());
+        Integer baseLevel = parseOptionalInt(config.get("base_level"));
+        int variance = getInt(config.get("variance"), 0);
 
-        double effectiveDistance = Math.max(0.0, distance - bufferDistance);
-        int calculatedLevel = baseLevel + (int) Math.floor(effectiveDistance / distancePerLevel);
+        return new CompiledSpawnDistanceConfig(originX, originZ, bufferDistance, distancePerLevel, baseLevel, variance);
+    }
+
+    @Override
+    public String name() {
+        return "SPAWN_DISTANCE";
+    }
+
+    @Override
+    public int calculateLevel(MobContext context, EffectiveRule rule) {
+        CompiledSpawnDistanceConfig compiled = (rule != null && rule.compiledStrategyConfig() instanceof CompiledSpawnDistanceConfig c)
+            ? c
+            : compileConfig(rule != null ? rule.strategyConfig() : Map.of());
+
+        double mobX = 0.0;
+        double mobZ = 0.0;
+        if (context != null) {
+            if (context.blockPos() != null) {
+                mobX = context.blockPos().getX();
+                mobZ = context.blockPos().getZ();
+            } else if (context.position() != null) {
+                mobX = context.position().x;
+                mobZ = context.position().z;
+            }
+        }
+
+        double distance = Math.hypot(mobX - compiled.originX(), mobZ - compiled.originZ());
+        int base = (compiled.baseLevel() != null) ? compiled.baseLevel() : ((rule != null) ? rule.levelRange().min() : 1);
+        int calculatedLevel = calculate(distance, compiled.distancePerLevel(), base, compiled.bufferDistance());
 
         // Apply variance
-        int variance = getInt(config.get("variance"), 0);
-        if (variance > 0) {
-            calculatedLevel += RandomVarianceGenerator.generateVariance(variance, true);
+        if (compiled.variance() > 0) {
+            calculatedLevel += RandomVarianceGenerator.generateVariance(compiled.variance(), true);
         }
 
-        return rule.levelRange().clamp(calculatedLevel);
+        return (rule != null) ? rule.levelRange().clamp(calculatedLevel) : calculatedLevel;
     }
 
     public static int calculate(double distance, double distancePerLevel, int baseLevel, double bufferDistance) {
@@ -80,6 +100,14 @@ public class SpawnDistanceStrategy implements LevelStrategy {
             try { return Double.parseDouble(String.valueOf(obj)); } catch (NumberFormatException ignored) {}
         }
         return def;
+    }
+
+    private static Integer parseOptionalInt(Object obj) {
+        if (obj instanceof Number num) return num.intValue();
+        if (obj != null) {
+            try { return Integer.parseInt(String.valueOf(obj).trim()); } catch (NumberFormatException ignored) {}
+        }
+        return null;
     }
 
     private static int getInt(Object obj, int def) {

@@ -75,6 +75,7 @@ public class ConfigLoader {
             // Apply loaded settings
             if (queue != null) {
                 queue.setMaxMobsPerTick(currentConfig.maxMobsPerTick());
+                queue.setMaxProcessTimeMs(currentConfig.effectiveMaxProcessTimeMs());
             }
             if (nametagService != null) {
                 nametagService.setTemplate(currentConfig.nametagTemplate());
