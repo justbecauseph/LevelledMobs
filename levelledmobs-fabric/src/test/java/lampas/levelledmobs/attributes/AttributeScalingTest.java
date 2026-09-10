@@ -2,6 +2,7 @@ package lampas.levelledmobs.attributes;
 
 import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
+import lampas.levelledmobs.data.LevelledMobModifier;
 import lampas.levelledmobs.events.CombatHandler;
 import lampas.levelledmobs.rules.EffectiveRule;
 import lampas.levelledmobs.rules.IntRange;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -359,5 +361,56 @@ public class AttributeScalingTest {
 
         assertEquals(3.5, resolvedPerLevel, 0.001);
         assertEquals(net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_BASE, resolvedOp);
+    }
+
+    @Test
+    public void testResolvedPlanStoresEffectiveAmountsAndStableIdentities() {
+        LevelRule rule = LevelRule.builder("retained_rule")
+            .priority(1)
+            .levelRange(IntRange.of(1, 20))
+            .attributeSettings(Map.of(
+                "max_health", 9.0,
+                "armor_operation", "ADD_MULTIPLIED_BASE"
+            ))
+            .build();
+        EffectiveRule effective = EffectiveRule.merge(List.of(rule));
+        AttributeScalingService service = new AttributeScalingService();
+
+        List<LevelledMobModifier> plan = service.resolveEffectiveModifierPlan(6, effective);
+        LevelledMobModifier health = plan.stream()
+            .filter(modifier -> modifier.attributeKey().equals("max_health"))
+            .findFirst()
+            .orElseThrow();
+        LevelledMobModifier armor = plan.stream()
+            .filter(modifier -> modifier.attributeKey().equals("armor"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(AttributeDefinition.ALL.size(), plan.size());
+        assertEquals("lampas:levelled/max_health", health.modifierId());
+        assertEquals(45.0, health.amount(), 0.001);
+        assertEquals("add_value", health.operation());
+        assertEquals("add_multiplied_base", armor.operation());
+
+        // The plan records the resolved amount; changing defaults later cannot
+        // alter the already-created entity's retained formula outcome.
+        service.setDefaultFormula(AttributeDefinition.MAX_HEALTH.key(),
+            AttributeFormula.simpleAddition(AttributeDefinition.MAX_HEALTH, 100.0));
+        assertEquals(45.0, health.amount(), 0.001);
+    }
+
+    @Test
+    public void testLegacyOrMalformedPlanIsRejectedBeforeAnyAttributeApply() {
+        AttributeScalingService service = new AttributeScalingService();
+        LevelledMobData legacy = new LevelledMobData(10, true, "legacy", 1L);
+        assertFalse(service.restorePersistedModifiers(null, legacy));
+
+        List<LevelledMobModifier> malformed = new ArrayList<>(
+            service.resolveEffectiveModifierPlan(10, null)
+        );
+        malformed.set(0, new LevelledMobModifier("max_health", "lampas:wrong/id", 18.0, "add_value"));
+        LevelledMobData invalid = LevelledMobData.of(10, "bad")
+            .withEffectiveModifiers(malformed);
+        assertFalse(service.restorePersistedModifiers(null, invalid));
     }
 }

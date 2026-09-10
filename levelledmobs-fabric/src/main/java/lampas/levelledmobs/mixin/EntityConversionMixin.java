@@ -38,7 +38,7 @@ public abstract class EntityConversionMixin {
             if (data != null && data.levelled()) {
                 convHolder.lampas$setLevelData(data);
                 if (LevelledMobsModule.getMobLevelingService() != null) {
-                    LevelledMobsModule.getMobLevelingService().setLevel(converted, data.level(), data.ruleSet());
+                    LevelledMobsModule.getMobLevelingService().restoreLevelledData(converted, data);
                 }
             }
         }

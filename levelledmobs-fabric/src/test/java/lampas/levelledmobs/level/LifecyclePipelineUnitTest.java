@@ -1,6 +1,7 @@
 package lampas.levelledmobs.level;
 
 import lampas.levelledmobs.attributes.AttributeScalingService;
+import lampas.levelledmobs.attributes.AttributeDefinition;
 import lampas.levelledmobs.attributes.HealthPolicy;
 import lampas.levelledmobs.config.LevelledMobsConfig;
 import lampas.levelledmobs.data.LevelledMobData;
@@ -13,6 +14,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -156,9 +158,10 @@ public class LifecyclePipelineUnitTest {
         assertEquals(15, config8Fields.effectiveMaxProcessTimeMs());
     }
 
-    private static class DummyLivingEntity extends net.minecraft.world.entity.LivingEntity {
+    private static class DummyLivingEntity extends net.minecraft.world.entity.LivingEntity implements LevelledMobHolder {
         private java.util.UUID uuid;
         private boolean alive = true;
+        private LevelledMobData levelData;
 
         protected DummyLivingEntity() {
             super(null, null);
@@ -195,6 +198,16 @@ public class LifecyclePipelineUnitTest {
         @Override
         public boolean isAlive() {
             return alive;
+        }
+
+        @Override
+        public LevelledMobData lampas$getLevelData() {
+            return levelData != null ? levelData : LevelledMobData.EMPTY;
+        }
+
+        @Override
+        public void lampas$setLevelData(LevelledMobData data) {
+            levelData = data != null ? data : LevelledMobData.EMPTY;
         }
 
         public void setAlive(boolean alive) {
@@ -307,5 +320,73 @@ public class LifecyclePipelineUnitTest {
         int processed = queue.processTick();
         assertEquals(1, processed, "Forward progress guarantees at least 1 mob is processed");
         assertEquals(9, queue.size(), "Time budget must stop further processing in same tick");
+    }
+
+    @Test
+    public void testManagedDeferralRequeuesOnNextTick() {
+        AtomicInteger processCount = new AtomicInteger(0);
+        MobLevelingService mockService = new MobLevelingService(new RuleManager(), new AttributeScalingService(), new NametagService()) {
+            @Override
+            public void onEntityLoad(LivingEntity entity, SpawnReason spawnReason) {
+                if (processCount.getAndIncrement() == 0) {
+                    deferEntity(entity);
+                }
+            }
+        };
+
+        MobProcessingQueue queue = new MobProcessingQueue(mockService);
+        DummyLivingEntity entity = DummyLivingEntity.create(java.util.UUID.randomUUID());
+        queue.enqueue(entity, SpawnReason.NATURAL);
+
+        assertEquals(0, queue.processTick(), "A deferred managed mob is not counted as successfully processed");
+        assertEquals(1, queue.size(), "A deferred managed mob must remain pending");
+        assertEquals(1, queue.processTick(), "The bounded retry must run on the next server tick");
+        assertEquals(0, queue.size());
+        assertEquals(2, processCount.get());
+    }
+
+    @Test
+    public void testManagedDeferralHasBoundedRetries() {
+        AtomicInteger processCount = new AtomicInteger(0);
+        MobLevelingService mockService = new MobLevelingService(new RuleManager(), new AttributeScalingService(), new NametagService()) {
+            @Override
+            public void onEntityLoad(LivingEntity entity, SpawnReason spawnReason) {
+                processCount.incrementAndGet();
+                deferEntity(entity);
+            }
+        };
+
+        MobProcessingQueue queue = new MobProcessingQueue(mockService);
+        queue.setMaxMobsPerTick(1);
+        DummyLivingEntity entity = DummyLivingEntity.create(java.util.UUID.randomUUID());
+        queue.enqueue(entity, SpawnReason.NATURAL);
+
+        for (int i = 0; i <= MobProcessingQueue.MAX_DEFERRED_RETRIES; i++) {
+            queue.processTick();
+        }
+
+        assertEquals(0, queue.size(), "Unavailable managed context must eventually release its pending entity");
+        assertEquals(MobProcessingQueue.MAX_DEFERRED_RETRIES + 1, processCount.get());
+        assertTrue(entity.lampas$getLevelData().quarantined(),
+            "An exhausted managed retry must leave a durable quarantine marker");
+    }
+
+    @Test
+    public void testMalformedRetentionLeavesExistingModifierUntouched() {
+        AttributeScalingService service = new AttributeScalingService();
+        DummyLivingEntity entity = DummyLivingEntity.create(java.util.UUID.randomUUID());
+        var instance = entity.getAttribute(AttributeDefinition.MAX_HEALTH.attribute());
+        assertNotNull(instance);
+        instance.addPermanentModifier(new AttributeModifier(
+            AttributeDefinition.MAX_HEALTH.modifierId(), 7.0D, AttributeModifier.Operation.ADD_VALUE));
+
+        java.util.List<lampas.levelledmobs.data.LevelledMobModifier> malformed =
+            new java.util.ArrayList<>(service.resolveEffectiveModifierPlan(4, null));
+        malformed.set(0, new lampas.levelledmobs.data.LevelledMobModifier(
+            "max_health", "lampas:wrong/id", 7.0D, "add_value"));
+        LevelledMobData data = LevelledMobData.of(4, "malformed").withEffectiveModifiers(malformed);
+
+        assertFalse(service.restorePersistedModifiers(entity, data));
+        assertEquals(7.0D, instance.getModifier(AttributeDefinition.MAX_HEALTH.modifierId()).amount());
     }
 }

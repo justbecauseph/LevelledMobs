@@ -1,6 +1,7 @@
 package lampas.levelledmobs.rules;
 
 import lampas.levelledmobs.context.MobContext;
+import lampas.levelledmobs.rules.strategy.StrategyRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,7 @@ public class RuleManager {
     public void setRules(List<LevelRule> rules) {
         CompiledRules compiled = new CompiledRules(rules);
         compiledRules.set(compiled);
+        StrategyRegistry.INSTANCE.clearConfigurationCaches();
         LOGGER.info("Loaded {} active LevelledMobs rules.", compiled.ruleCount());
     }
 

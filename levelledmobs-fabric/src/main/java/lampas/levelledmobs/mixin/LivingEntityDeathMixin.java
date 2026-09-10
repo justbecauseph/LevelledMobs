@@ -3,19 +3,20 @@ package lampas.levelledmobs.mixin;
 import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
 import lampas.levelledmobs.drops.XpScalingService;
-import lampas.levelledmobs.drops.custom.CustomDropsHandler;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Mixin scaling death XP rewards and triggering custom drop tables upon mob death.
+ * Mixin scaling death XP rewards.
+ *
+ * <p>Configured LevelledMobs custom drops remain dormant by policy. There is
+ * deliberately no injection into vanilla's custom-death-loot method, so the
+ * ordinary vanilla drop pipeline remains responsible for ordinary drops.</p>
  */
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityDeathMixin {
@@ -36,11 +37,4 @@ public abstract class LivingEntityDeathMixin {
         }
     }
 
-    @Inject(
-        method = "dropCustomDeathLoot",
-        at = @At("TAIL")
-    )
-    private void lampas$handleCustomDeathDrops(ServerLevel level, DamageSource damageSource, boolean hitByPlayer, CallbackInfo ci) {
-        CustomDropsHandler.handleDeathDrops((LivingEntity) (Object) this, level, damageSource);
-    }
 }

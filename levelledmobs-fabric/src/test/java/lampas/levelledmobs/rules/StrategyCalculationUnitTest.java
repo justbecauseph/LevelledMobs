@@ -288,6 +288,68 @@ public class StrategyCalculationUnitTest {
         assertEquals(3, compiledPlayer.variance());
     }
 
+    @Test
+    public void testContextAwareStrategyOverrideWinsOnlyForSelectedRule() {
+        StrategyRegistry registry = new StrategyRegistry();
+        LevelStrategy configured = registry.getStrategy("SPAWN_DISTANCE");
+        LevelStrategy managed = new LevelStrategy() {
+            @Override
+            public String name() {
+                return "MANAGED_TEST";
+            }
+
+            @Override
+            public int calculateLevel(MobContext context, EffectiveRule rule) {
+                return 7;
+            }
+        };
+
+        EffectiveRule selected = EffectiveRule.merge(List.of(
+            LevelRule.builder("managed_rule")
+                .levelRange(IntRange.of(1, 10))
+                .strategy("SPAWN_DISTANCE", Map.of())
+                .build()
+        ));
+        EffectiveRule ordinary = EffectiveRule.merge(List.of(
+            LevelRule.builder("ordinary_rule")
+                .levelRange(IntRange.of(1, 10))
+                .strategy("SPAWN_DISTANCE", Map.of())
+                .build()
+        ));
+
+        registry.registerOverride((context, rule) -> rule == selected, managed);
+
+        assertSame(managed, registry.resolveStrategy(selected.strategyName(), null, selected));
+        assertSame(configured, registry.resolveStrategy(ordinary.strategyName(), null, ordinary));
+    }
+
+    @Test
+    public void testConfigurationReloadClearsRegisteredStrategyState() {
+        java.util.concurrent.atomic.AtomicBoolean cleared = new java.util.concurrent.atomic.AtomicBoolean();
+        LevelStrategy stateful = new LevelStrategy() {
+            @Override
+            public String name() {
+                return "CACHE_TEST";
+            }
+
+            @Override
+            public int calculateLevel(MobContext context, EffectiveRule rule) {
+                return 1;
+            }
+
+            @Override
+            public void clearConfigurationCache() {
+                cleared.set(true);
+            }
+        };
+
+        StrategyRegistry registry = new StrategyRegistry();
+        registry.register(stateful);
+        registry.clearConfigurationCaches();
+
+        assertTrue(cleared.get(), "Rule reload must clear state held by registered strategies");
+    }
+
     private static class InstrumentedCountingContext extends StrategyMockContext {
         private int nearestPlayerInvocations = 0;
 

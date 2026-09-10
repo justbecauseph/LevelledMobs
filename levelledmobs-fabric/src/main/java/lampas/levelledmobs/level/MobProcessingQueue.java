@@ -19,13 +19,19 @@ import java.util.function.LongSupplier;
 public class MobProcessingQueue {
     private static final Logger LOGGER = LoggerFactory.getLogger("LevelledMobs");
     public static final int DEFAULT_MAX_PROCESS_TIME_MS = 2;
+    /** One retry per tick for up to 60 seconds while the managed provider boots. */
+    public static final int MAX_DEFERRED_RETRIES = 1_200;
+    /** Hard cap on retained entity references waiting for managed context. */
+    public static final int MAX_DEFERRED_PENDING = 4_096;
 
     private final MobLevelingService levelingService;
     private final LongSupplier nanoClock;
     private final Queue<QueueEntry> queue = new ConcurrentLinkedQueue<>();
     private final Set<UUID> queuedEntities = ConcurrentHashMap.newKeySet();
+    private final java.util.Map<UUID, Integer> deferredAttempts = new ConcurrentHashMap<>();
     private int maxMobsPerTick = 50;
     private int maxProcessTimeMs = DEFAULT_MAX_PROCESS_TIME_MS;
+    private long tickCounter;
 
     public MobProcessingQueue(MobLevelingService levelingService) {
         this(levelingService, System::nanoTime);
@@ -45,7 +51,36 @@ public class MobProcessingQueue {
         }
         UUID uuid = entity.getUUID();
         if (uuid == null || queuedEntities.add(uuid)) {
-            queue.add(new QueueEntry(entity, reason));
+            queue.add(new QueueEntry(entity, reason, tickCounter, 0));
+        }
+    }
+
+    /**
+     * Requeues a managed entity for the next server tick after a strategy
+     * reports that its external creation context is not ready. Retries are
+     * capped so an unavailable provider cannot retain entities indefinitely.
+     */
+    private void defer(LivingEntity entity, SpawnReason reason) {
+        if (entity == null || entity.isRemoved() || entity.getUUID() == null) return;
+        UUID uuid = entity.getUUID();
+        boolean alreadyPending = deferredAttempts.containsKey(uuid);
+        int attempt = deferredAttempts.merge(uuid, 1, Integer::sum);
+        if (attempt > MAX_DEFERRED_RETRIES) {
+            deferredAttempts.remove(uuid);
+            levelingService.markQuarantined(entity, "managed creation context did not become available");
+            LOGGER.warn("Exhausted deferred LevelledMobs leveling for {} (UUID: {}) after {} retries; mob is quarantined",
+                entity.getType().getDescription().getString(), uuid, MAX_DEFERRED_RETRIES);
+            return;
+        }
+        if (!alreadyPending && deferredAttempts.size() > MAX_DEFERRED_PENDING) {
+            deferredAttempts.remove(uuid);
+            levelingService.markQuarantined(entity, "deferred managed-mob queue capacity reached");
+            LOGGER.warn("Quarantined deferred LevelledMobs entity {} (UUID: {}): queue capacity {} reached",
+                entity.getType().getDescription().getString(), uuid, MAX_DEFERRED_PENDING);
+            return;
+        }
+        if (queuedEntities.add(uuid)) {
+            queue.add(new QueueEntry(entity, reason, tickCounter + 1, attempt));
         }
     }
 
@@ -59,6 +94,8 @@ public class MobProcessingQueue {
             return 0;
         }
 
+        tickCounter++;
+
         long startNs = nanoClock.getAsLong();
         long budgetNs = (long) maxProcessTimeMs * 1_000_000L;
         int attempts = 0;
@@ -71,21 +108,39 @@ public class MobProcessingQueue {
 
             QueueEntry entry = queue.poll();
             if (entry == null) break;
+            if (entry.readyTick() > tickCounter) {
+                queue.add(entry);
+                break;
+            }
             attempts++;
 
             LivingEntity entity = entry.entity();
             if (entity != null) {
-                if (entity.getUUID() != null) {
-                    queuedEntities.remove(entity.getUUID());
+                UUID entityUuid = entity.getUUID();
+                if (entityUuid != null) {
+                    queuedEntities.remove(entityUuid);
                 }
                 if (!entity.isRemoved() && entity.isAlive()) {
                     try {
                         levelingService.onEntityLoad(entity, entry.reason());
-                        processed++;
+                        if (levelingService.consumeDeferred(entity)) {
+                            defer(entity, entry.reason());
+                        } else {
+                            if (entityUuid != null) {
+                                deferredAttempts.remove(entityUuid);
+                            }
+                            processed++;
+                        }
                     } catch (Exception e) {
+                        if (entityUuid != null) {
+                            deferredAttempts.remove(entityUuid);
+                        }
+                        levelingService.consumeDeferred(entity);
                         LOGGER.error("Failed to process queued entity leveling for {} (UUID: {})",
                             entity.getType().getDescription().getString(), entity.getUUID(), e);
                     }
+                } else if (entityUuid != null) {
+                    deferredAttempts.remove(entityUuid);
                 }
             }
         }
@@ -100,6 +155,7 @@ public class MobProcessingQueue {
     public void clear() {
         queue.clear();
         queuedEntities.clear();
+        deferredAttempts.clear();
     }
 
     public int maxMobsPerTick() {
@@ -118,5 +174,9 @@ public class MobProcessingQueue {
         this.maxProcessTimeMs = Math.max(1, maxMs);
     }
 
-    public record QueueEntry(LivingEntity entity, SpawnReason reason) {}
+    public record QueueEntry(LivingEntity entity, SpawnReason reason, long readyTick, int attempt) {
+        public QueueEntry(LivingEntity entity, SpawnReason reason) {
+            this(entity, reason, 0L, 0);
+        }
+    }
 }

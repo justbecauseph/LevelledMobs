@@ -1,5 +1,7 @@
 package lampas.levelledmobs.attributes;
 
+import lampas.levelledmobs.data.LevelledMobData;
+import lampas.levelledmobs.data.LevelledMobModifier;
 import lampas.levelledmobs.rules.EffectiveRule;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -8,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,59 +76,147 @@ public class AttributeScalingService {
      */
     public void applyModifiers(LivingEntity entity, int level, EffectiveRule rule, HealthPolicy healthPolicy) {
         if (entity == null) return;
-        HealthPolicy policy = (healthPolicy != null) ? healthPolicy : HealthPolicy.PRESERVE_RATIO;
+        applyModifiers(entity, resolveEffectiveModifierPlan(level, rule), healthPolicy);
+    }
 
-        float prevHealth = entity.getHealth();
-        float prevMaxHealth = entity.getMaxHealth();
-
+    /**
+     * Resolves the exact modifier outcome for a newly-created mob.
+     *
+     * <p>All supported definitions are included, including zero amounts, so a
+     * persisted plan can also remove a stale LevelledMobs modifier without
+     * changing unrelated attribute modifiers.</p>
+     */
+    public List<LevelledMobModifier> resolveEffectiveModifierPlan(int level, EffectiveRule rule) {
         List<CompiledAttributeModifier> rulePlan = (rule != null) ? rule.compiledAttributes() : null;
         List<CompiledAttributeModifier> fallbackPlan = this.cachedDefaultPlan;
+        List<LevelledMobModifier> result = new ArrayList<>(AttributeDefinition.ALL.size());
 
         for (int i = 0; i < AttributeDefinition.ALL.size(); i++) {
             CompiledAttributeModifier ruleMod = (rulePlan != null && i < rulePlan.size()) ? rulePlan.get(i) : null;
             CompiledAttributeModifier fallbackMod = fallbackPlan.get(i);
-
             AttributeDefinition def = fallbackMod.definition();
-            AttributeInstance instance = entity.getAttribute(def.attribute());
-            if (instance == null) continue;
 
             double perLevel = (ruleMod != null && ruleMod.hasExplicitValue())
                 ? ruleMod.perLevel()
                 : fallbackMod.perLevel();
-
-            AttributeModifier.Operation desiredOp = (ruleMod != null && ruleMod.hasExplicitOperation())
+            AttributeModifier.Operation operation = (ruleMod != null && ruleMod.hasExplicitOperation())
                 ? ruleMod.operation()
                 : fallbackMod.operation();
+            double amount = (level > 1) ? ((level - 1) * perLevel) : 0.0;
 
-            double desiredValue = (level > 1) ? ((level - 1) * perLevel) : 0.0;
-            AttributeModifier existing = instance.getModifier(def.modifierId());
+            result.add(new LevelledMobModifier(
+                def.key(),
+                def.modifierId().toString(),
+                amount,
+                operation.getSerializedName()
+            ));
+        }
+        return List.copyOf(result);
+    }
 
-            if (desiredValue != 0.0) {
-                if (existing != null) {
-                    if (existing.amount() == desiredValue && existing.operation() == desiredOp) {
-                        continue; // Matching modifier already present, skip no-op removal/re-addition
-                    }
-                    instance.removeModifier(def.modifierId());
-                }
-                instance.addPermanentModifier(new AttributeModifier(
-                    def.modifierId(),
-                    desiredValue,
-                    desiredOp
-                ));
-            } else {
-                if (existing != null) {
-                    instance.removeModifier(def.modifierId());
-                }
+    /** Applies a resolved plan while retaining the existing public scaling API. */
+    public void applyModifiers(LivingEntity entity, List<LevelledMobModifier> plan, HealthPolicy healthPolicy) {
+        if (entity == null || plan == null) return;
+        HealthPolicy policy = (healthPolicy != null) ? healthPolicy : HealthPolicy.PRESERVE_RATIO;
+
+        Map<String, LevelledMobModifier> byKey = new HashMap<>();
+        for (LevelledMobModifier modifier : plan) {
+            if (modifier != null) {
+                byKey.putIfAbsent(modifier.attributeKey(), modifier);
+            }
+        }
+        applyModifierMap(entity, byKey, policy);
+    }
+
+    /**
+     * Restores a current-format plan exactly. Legacy or malformed plans return
+     * false and leave all existing attributes untouched.
+     */
+    public boolean restorePersistedModifiers(LivingEntity entity, LevelledMobData data) {
+        if (entity == null || data == null || !data.hasPersistedModifiers()) {
+            return false;
+        }
+        if (data.effectiveModifiers().size() != AttributeDefinition.ALL.size()) {
+            return false;
+        }
+
+        Map<String, LevelledMobModifier> byKey = new HashMap<>();
+        for (LevelledMobModifier modifier : data.effectiveModifiers()) {
+            if (modifier == null || !Double.isFinite(modifier.amount()) ||
+                byKey.putIfAbsent(modifier.attributeKey(), modifier) != null) {
+                return false;
             }
         }
 
-        // Update health according to health policy
-        policy.apply(entity, prevHealth, prevMaxHealth);
+        for (AttributeDefinition def : AttributeDefinition.ALL) {
+            LevelledMobModifier modifier = byKey.get(def.key());
+            if (modifier == null || !def.modifierId().toString().equals(modifier.modifierId()) ||
+                parseOperation(modifier.operation()) == null) {
+                return false;
+            }
+        }
+
+        applyModifierMap(entity, byKey, HealthPolicy.PRESERVE_RATIO);
+        return true;
+    }
+
+    private void applyModifierMap(
+        LivingEntity entity,
+        Map<String, LevelledMobModifier> modifiers,
+        HealthPolicy healthPolicy
+    ) {
+        float prevHealth = entity.getHealth();
+        float prevMaxHealth = entity.getMaxHealth();
+
+        for (AttributeDefinition def : AttributeDefinition.ALL) {
+            LevelledMobModifier persisted = modifiers.get(def.key());
+            if (persisted == null) continue;
+
+            AttributeInstance instance = entity.getAttribute(def.attribute());
+            if (instance == null) continue;
+
+            AttributeModifier.Operation desiredOp = parseOperation(persisted.operation());
+            if (desiredOp == null) continue;
+            applyModifier(instance, def, persisted.amount(), desiredOp);
+        }
+
+        healthPolicy.apply(entity, prevHealth, prevMaxHealth);
 
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Applied Lv. {} attribute modifiers to {} (UUID: {}) with HealthPolicy: {}",
-                level, entity.getType().getDescription().getString(), entity.getUUID(), policy);
+            LOGGER.debug("Applied persisted LevelledMobs attribute modifiers to {} (UUID: {}) with HealthPolicy: {}",
+                entity.getType().getDescription().getString(), entity.getUUID(), healthPolicy);
         }
+    }
+
+    private static void applyModifier(
+        AttributeInstance instance,
+        AttributeDefinition def,
+        double desiredValue,
+        AttributeModifier.Operation desiredOp
+    ) {
+        AttributeModifier existing = instance.getModifier(def.modifierId());
+        if (desiredValue != 0.0) {
+            if (existing != null) {
+                if (Double.compare(existing.amount(), desiredValue) == 0 && existing.operation() == desiredOp) {
+                    return; // Matching modifier already present; avoid stacking or churn.
+                }
+                instance.removeModifier(def.modifierId());
+            }
+            instance.addPermanentModifier(new AttributeModifier(def.modifierId(), desiredValue, desiredOp));
+        } else if (existing != null) {
+            instance.removeModifier(def.modifierId());
+        }
+    }
+
+    private static AttributeModifier.Operation parseOperation(String serialized) {
+        if (serialized == null) return null;
+        for (AttributeModifier.Operation operation : AttributeModifier.Operation.values()) {
+            if (operation.name().equalsIgnoreCase(serialized) ||
+                operation.getSerializedName().equalsIgnoreCase(serialized)) {
+                return operation;
+            }
+        }
+        return null;
     }
 
     public synchronized void setDefaultFormula(String attributeKey, AttributeFormula formula) {
