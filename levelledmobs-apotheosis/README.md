@@ -46,7 +46,15 @@ All five bands are required when overriding them. Bands must be ordered, non-ove
 
 Apotheosis World Tier is per player. The addon mirrors Apotheosis's monster behavior by using the nearest player anywhere in the mob's dimension. If no player exists in that dimension, the rule minimum is used.
 
-The tier is consulted only when LevelledMobs first assigns the mob's persistent level. Existing mobs are not relevelled when a player moves or changes World Tier. Apotheosis continues to own its tier augments; the addon neither applies nor removes them.
+In standalone mode the tier is consulted only when LevelledMobs first assigns the mob's persistent level. Existing mobs are not relevelled when a player moves or changes World Tier. Apotheosis continues to own its tier augments; the addon neither applies nor removes them.
+
+## Managed mode (Yggdrasil)
+
+When Yggdrasil installs the Apotheosis tier provider, the mobs it manages take their tier and level bounds from their creation context instead of from nearby players. When that context changes, a relevel is queued for the mob. The relevel moves the mob into the new tier band and keeps its rule id. Its health is kept by ratio, and its level and modifiers are replaced. A level that is still inside the band is left alone. Admin-set and quarantined mobs are never relevelled.
+
+If the managed context is briefly unavailable, for example while content is being published, the relevel is retried on later ticks for up to 1200 attempts. After that the mob is dropped from the queue and keeps its current level. A retry never quarantines the mob.
+
+Loading a mob never relevels it, so edits to the band settings in `rules.json` do not reroll existing mobs. Standalone behaviour, with no provider installed, is unchanged.
 
 ## Local build and tests
 
@@ -83,4 +91,4 @@ Run only the live integration test with:
 .\gradlew.bat :levelledmobs-apotheosis:runGameTest
 ```
 
-The GameTest boots Minecraft 26.2 on Fabric and verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes.
+The GameTests boot Minecraft 26.2 on Fabric. The standalone test verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes. The managed test verifies that a creation-tier change relevels a loaded mob into the new band, with its health kept by ratio.

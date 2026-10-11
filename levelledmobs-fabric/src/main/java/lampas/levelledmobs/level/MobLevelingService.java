@@ -35,6 +35,7 @@ public class MobLevelingService {
     private final AttributeScalingService attributeService;
     private final NametagService nametagService;
     private final BossClassifier bossClassifier;
+    private final StrategyRegistry strategies;
     private final RandomSource random = RandomSource.create();
     private final Set<UUID> deferredEntities = ConcurrentHashMap.newKeySet();
 
@@ -43,10 +44,21 @@ public class MobLevelingService {
     }
 
     public MobLevelingService(RuleManager ruleManager, AttributeScalingService attributeService, NametagService nametagService, BossClassifier bossClassifier) {
+        this(ruleManager, attributeService, nametagService, bossClassifier, StrategyRegistry.INSTANCE);
+    }
+
+    public MobLevelingService(
+        RuleManager ruleManager,
+        AttributeScalingService attributeService,
+        NametagService nametagService,
+        BossClassifier bossClassifier,
+        StrategyRegistry strategies
+    ) {
         this.ruleManager = ruleManager;
         this.attributeService = attributeService;
         this.nametagService = nametagService;
         this.bossClassifier = bossClassifier != null ? bossClassifier : new BossClassifier();
+        this.strategies = strategies != null ? strategies : StrategyRegistry.INSTANCE;
     }
 
     /**
@@ -118,7 +130,7 @@ public class MobLevelingService {
 
         if (result.matched() && entity instanceof Monster && !entity.isBaby()) {
             EffectiveRule rule = result.effectiveRule();
-            LevelStrategy strategy = StrategyRegistry.INSTANCE.resolveStrategy(rule.strategyName(), context, rule);
+            LevelStrategy strategy = strategies.resolveStrategy(rule.strategyName(), context, rule);
 
             int level = lampas.levelledmobs.compatibility.ModdedMobHandler.getPredefinedLevel(entity)
                 .orElseGet(() -> strategy.calculateLevel(context, rule));
@@ -179,6 +191,99 @@ public class MobLevelingService {
             LOGGER.debug("Levelled {} (UUID: {}) to Lv. {} via strategy '{}' in rule '{}'",
                 entity.getType().getDescription().getString(), entity.getUUID(), level, strategy.name(), rule.primaryRuleId());
         }
+    }
+
+    /**
+     * Re-evaluates an already levelled mob against its current rule and strategy, for example after its managed
+     * creation band changed. The stored rule id, generation time and quarantine state are kept. The level and
+     * modifiers are replaced only when the strategy no longer accepts the current level. Modifiers are replaced by
+     * stable id and health follows PRESERVE_RATIO.
+     *
+     * <p>A strategy that cannot produce a level right now leaves the mob exactly as it was, and the mob is never
+     * quarantined by this path. When the strategy reports that its managed creation context is temporarily
+     * unavailable (see {@link LevelStrategy#shouldRetryDeferredLevel}), the outcome is
+     * {@link RelevelOutcome#DEFERRED} so the queue can retry. Any other refusal is {@link RelevelOutcome#DROPPED}.
+     * Unlevelled, quarantined, admin-set ("custom" or "manual") and predefined-level mobs are skipped.</p>
+     *
+     * @return true when the level or modifiers were replaced
+     */
+    public boolean relevelManaged(LivingEntity entity) {
+        return relevelOutcome(entity) == RelevelOutcome.CHANGED;
+    }
+
+    /** Outcome of one managed relevel attempt. */
+    enum RelevelOutcome {
+        /** The level or modifiers were replaced. */
+        CHANGED,
+        /** The mob is ineligible or its current level is still valid. Nothing was touched. */
+        UNCHANGED,
+        /** The managed creation context is temporarily unavailable. Nothing was touched; retry later. */
+        DEFERRED,
+        /** The strategy cannot produce a trusted level for this mob. Nothing was touched; do not retry. */
+        DROPPED
+    }
+
+    RelevelOutcome relevelOutcome(LivingEntity entity) {
+        if (!(entity instanceof LevelledMobHolder holder) || entity.isRemoved() || !entity.isAlive()) {
+            return RelevelOutcome.UNCHANGED;
+        }
+
+        LevelledMobData data = holder.lampas$getLevelData();
+        if (data == null || !data.levelled() || data.quarantined() || isAdminSet(data.ruleSet())) {
+            return RelevelOutcome.UNCHANGED;
+        }
+        if (!(entity instanceof Monster) || entity.isBaby()) {
+            return RelevelOutcome.UNCHANGED;
+        }
+        if (lampas.levelledmobs.compatibility.ModdedMobHandler.getPredefinedLevel(entity).isPresent()) {
+            return RelevelOutcome.UNCHANGED;
+        }
+
+        // Resolve the rule exactly as the fresh-level path does.
+        SpawnReason effectiveReason = SpawnReasonResolver.infer(entity, SpawnReason.NATURAL);
+        MobContext context = MobContext.of(entity, effectiveReason);
+        RuleResult result = ruleManager.resolve(context);
+        if (!result.matched()) {
+            return RelevelOutcome.UNCHANGED;
+        }
+        EffectiveRule rule = result.effectiveRule();
+        LevelStrategy strategy = strategies.resolveStrategy(rule.strategyName(), context, rule);
+
+        int currentLevel = data.level();
+        if (strategy.constrainLevel(context, rule, currentLevel) == currentLevel) {
+            return RelevelOutcome.UNCHANGED;
+        }
+
+        // Keep the current level when the strategy cannot produce a trusted
+        // one. Zero is a refusal: temporary (retry) or permanent (drop).
+        int newLevel = strategy.calculateLevel(context, rule);
+        if (newLevel > 0) {
+            newLevel = strategy.constrainLevel(context, rule, newLevel);
+        }
+        if (newLevel <= 0) {
+            if (strategy.shouldRetryDeferredLevel(context, rule)) {
+                LOGGER.debug("Deferred re-level of {} (UUID: {}) at Lv. {}: managed creation context unavailable",
+                    entity.getType().getDescription().getString(), entity.getUUID(), currentLevel);
+                return RelevelOutcome.DEFERRED;
+            }
+            LOGGER.debug("Kept Lv. {} for {} (UUID: {}) because strategy '{}' returned no level",
+                currentLevel, entity.getType().getDescription().getString(), entity.getUUID(), strategy.name());
+            return RelevelOutcome.DROPPED;
+        }
+
+        List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(newLevel, rule);
+        attributeService.applyModifiers(entity, effectiveModifiers, HealthPolicy.PRESERVE_RATIO);
+        holder.lampas$setLevelData(data.withRelevel(newLevel, effectiveModifiers));
+        nametagService.updateNametag(entity, newLevel, data.ruleSet());
+
+        LOGGER.debug("Re-levelled {} (UUID: {}) from Lv. {} to Lv. {} via strategy '{}' in rule '{}'",
+            entity.getType().getDescription().getString(), entity.getUUID(), currentLevel, newLevel,
+            strategy.name(), data.ruleSet());
+        return RelevelOutcome.CHANGED;
+    }
+
+    private static boolean isAdminSet(String ruleSet) {
+        return "custom".equalsIgnoreCase(ruleSet) || "manual".equalsIgnoreCase(ruleSet);
     }
 
     /**

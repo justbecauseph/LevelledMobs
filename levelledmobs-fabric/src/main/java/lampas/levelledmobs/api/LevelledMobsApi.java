@@ -4,6 +4,7 @@ import lampas.levelledmobs.LevelledMobsModule;
 import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
 import lampas.levelledmobs.data.SpawnReason;
+import lampas.levelledmobs.level.RelevelQueue;
 import net.minecraft.world.entity.LivingEntity;
 
 /**
@@ -43,11 +44,25 @@ public class LevelledMobsApi {
     }
 
     /**
-     * Forces the entity to recalculate its level using the active rule engine.
+     * Re-runs the lifecycle check for the entity. A levelled entity only has its saved modifiers restored; its level
+     * is not recalculated. Use {@link #relevelManaged(LivingEntity)} to re-tier a managed mob. An unlevelled entity is
+     * levelled from the active rule engine.
      */
     public static void relevel(LivingEntity entity) {
         if (LevelledMobsModule.getMobLevelingService() != null) {
             LevelledMobsModule.getMobLevelingService().level(entity, SpawnReason.COMMAND);
+        }
+    }
+
+    /**
+     * Queues a re-evaluation of a levelled managed mob against its current rule and strategy, for example after its
+     * creation band changed. The work runs on a later server tick, at most 32 mobs per tick. Unlevelled, quarantined,
+     * admin-set and mobs whose level is still valid are left unchanged.
+     */
+    public static void relevelManaged(LivingEntity entity) {
+        RelevelQueue queue = LevelledMobsModule.getRelevelQueue();
+        if (queue != null) {
+            queue.enqueue(entity);
         }
     }
 

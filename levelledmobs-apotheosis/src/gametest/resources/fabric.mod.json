@@ -6,7 +6,8 @@
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      "lampas.levelledmobs.apotheosis.gametest.ApotheosisWorldTierGameTests"
+      "lampas.levelledmobs.apotheosis.gametest.ApotheosisWorldTierGameTests",
+      "lampas.levelledmobs.apotheosis.gametest.ManagedWorldTierRelevelGameTests"
     ]
   },
   "depends": {

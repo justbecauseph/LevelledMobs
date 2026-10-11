@@ -6,11 +6,13 @@ import lampas.levelledmobs.events.ChunkLifecycleHandler;
 import lampas.levelledmobs.events.EntityLifecycleHandler;
 import lampas.levelledmobs.level.MobLevelingService;
 import lampas.levelledmobs.level.MobProcessingQueue;
+import lampas.levelledmobs.level.RelevelQueue;
 import lampas.levelledmobs.nametag.NametagService;
 import lampas.levelledmobs.rules.RuleManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.world.entity.LivingEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +31,7 @@ public class LevelledMobsModule implements ModInitializer {
     private NametagService nametagService;
     private MobLevelingService mobLevelingService;
     private MobProcessingQueue processingQueue;
+    private RelevelQueue relevelQueue;
     private lampas.levelledmobs.config.ConfigLoader configLoader;
 
     @Override
@@ -41,6 +44,7 @@ public class LevelledMobsModule implements ModInitializer {
         this.nametagService = new NametagService();
         this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService);
         this.processingQueue = new MobProcessingQueue(mobLevelingService);
+        this.relevelQueue = new RelevelQueue(mobLevelingService);
 
         // Load configuration and rules
         this.configLoader = new lampas.levelledmobs.config.ConfigLoader();
@@ -49,6 +53,7 @@ public class LevelledMobsModule implements ModInitializer {
         // Register lifecycle event handlers
         new EntityLifecycleHandler(processingQueue).register();
         new ChunkLifecycleHandler(processingQueue).register();
+        ServerTickEvents.END_SERVER_TICK.register(server -> relevelQueue.processTick());
 
         // Register Brigadier commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -68,6 +73,10 @@ public class LevelledMobsModule implements ModInitializer {
 
     public static MobProcessingQueue getProcessingQueue() {
         return instance != null ? instance.processingQueue : null;
+    }
+
+    public static RelevelQueue getRelevelQueue() {
+        return instance != null ? instance.relevelQueue : null;
     }
 
     public static RuleManager getRuleManager() {

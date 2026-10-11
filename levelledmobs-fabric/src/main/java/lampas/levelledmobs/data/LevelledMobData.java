@@ -67,6 +67,22 @@ public record LevelledMobData(
         );
     }
 
+    /**
+     * Replaces the level and its persisted plan for an already levelled mob. The stored rule id, generation time and
+     * quarantine state are kept. The plan is always stored in the current retention format.
+     */
+    public LevelledMobData withRelevel(int newLevel, List<LevelledMobModifier> modifiers) {
+        return new LevelledMobData(
+            newLevel,
+            levelled,
+            ruleSet,
+            generatedAt,
+            CURRENT_RETENTION_VERSION,
+            modifiers,
+            quarantined
+        );
+    }
+
     public LevelledMobData withQuarantined(boolean quarantined) {
         return new LevelledMobData(
             level,

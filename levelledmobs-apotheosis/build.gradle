@@ -52,6 +52,38 @@ def apothicAttributesModVersion = apothicAttributesVersion.contains('-')
 def placeboFabricJar = rootProject.file(
     project.findProperty('placebo_fabric_jar') ?: "../Placebo/fabric/build/libs/Placebo-${placeboVersion}.jar"
 )
+def gatewaysVersion = String.valueOf(
+    project.findProperty('gateways_version') ?: '26.2-7.0.1'
+)
+def gatewaysModVersion = gatewaysVersion.contains('-')
+    ? gatewaysVersion.substring(gatewaysVersion.indexOf('-') + 1)
+    : gatewaysVersion
+def gatewaysFabricJar = rootProject.file(
+    project.findProperty('gateways_fabric_jar') ?:
+        "../GatewaysToEternity/fabric/build/libs/GatewaysToEternity-${gatewaysVersion}.jar"
+)
+def apothicEnchantingVersion = String.valueOf(
+    project.findProperty('apothic_enchanting_version') ?: '26.2-3.0.1'
+)
+def apothicSpawnersVersion = String.valueOf(
+    project.findProperty('apothic_spawners_version') ?: '26.2-3.0.1'
+)
+def apothicEnchantingFabricJar = rootProject.file(
+    project.findProperty('apothic_enchanting_fabric_jar') ?:
+        "../Apothic-Enchanting/fabric/build/libs/ApothicEnchanting-${apothicEnchantingVersion}.jar"
+)
+def apothicSpawnersFabricJar = rootProject.file(
+    project.findProperty('apothic_spawners_fabric_jar') ?:
+        "../Apothic-Spawners/fabric/build/libs/ApothicSpawners-${apothicSpawnersVersion}.jar"
+)
+def patchouliFabricJar = rootProject.file(
+    project.findProperty('patchouli_fabric_jar') ?:
+        "../Patchouli/Fabric/build/libs/patchouli-fabric-26.2-95-SNAPSHOT.jar"
+)
+def lootrFabricJar = rootProject.file(
+    project.findProperty('lootr_fabric_jar') ?:
+        "../lampas-pipeline/test-instance/mods/lootr-fabric-26.2-1.24.39.121.jar"
+)
 def apothicAttributesFabricJar = rootProject.file(
     project.findProperty('apothic_attributes_fabric_jar') ?:
         "../Apothic-Attributes/fabric/build/libs/ApothicAttributes-${apothicAttributesVersion}.jar"
@@ -96,7 +128,19 @@ dependencies {
 
     gametestCompileOnly files(placeboFabricJar, apothicAttributesFabricJar)
     gametestRuntimeOnly "dev.architectury:architectury-fabric:${architecturyVersion}"
-    gametestRuntimeOnly files(placeboFabricJar, apothicAttributesFabricJar)
+    // Apotheosis references Gateways' entity classes, and the GameTest locator loads them, so the sibling
+    // Gateways JAR must be on the GameTest runtime classpath. It is not a compile dependency of the addon.
+    // The same sibling set as the frozen Yggdrasil combat stack. Apotheosis and Gateways reference these classes, and
+    // the GameTest locator loads them while scanning the test classes.
+    gametestRuntimeOnly files(
+        placeboFabricJar,
+        apothicAttributesFabricJar,
+        gatewaysFabricJar,
+        apothicEnchantingFabricJar,
+        apothicSpawnersFabricJar,
+        patchouliFabricJar,
+        lootrFabricJar
+    )
 }
 
 def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
@@ -146,11 +190,15 @@ def verifyApotheosisFabricJar = tasks.register('verifyApotheosisFabricJar') {
 }
 
 def verifyApotheosisGameTestRuntime = tasks.register('verifyApotheosisGameTestRuntime') {
-    inputs.files(placeboFabricJar, apothicAttributesFabricJar)
+    inputs.files(placeboFabricJar, apothicAttributesFabricJar, gatewaysFabricJar,
+        apothicEnchantingFabricJar, apothicSpawnersFabricJar, patchouliFabricJar, lootrFabricJar)
     doLast {
         [
             [file: placeboFabricJar, id: 'placebo', version: placeboModVersion],
-            [file: apothicAttributesFabricJar, id: 'apothic_attributes', version: apothicAttributesModVersion]
+            [file: apothicAttributesFabricJar, id: 'apothic_attributes', version: apothicAttributesModVersion],
+            [file: gatewaysFabricJar, id: 'gateways', version: gatewaysModVersion],
+            [file: apothicEnchantingFabricJar, id: 'apothic_enchanting', version: apothicEnchantingVersion.substring(apothicEnchantingVersion.indexOf('-') + 1)],
+            [file: apothicSpawnersFabricJar, id: 'apothic_spawners', version: apothicSpawnersVersion.substring(apothicSpawnersVersion.indexOf('-') + 1)]
         ].each { artifact ->
             if (!artifact.file.isFile()) {
                 throw new GradleException(
@@ -205,8 +253,8 @@ test {
     useJUnitPlatform()
 }
 
-def ownedGameTestName =
-    'levelledmobs-apotheosis-gametest:apotheosis_world_tier_game_tests_nearest_world_tier_drives_lifecycle_level_and_persists'
+// Both World Tier GameTests: the standalone nearest-player test and the managed creation-tier re-tier test.
+def ownedGameTestName = 'levelledmobs-apotheosis-gametest:*world_tier*'
 def gameTestReportFile = layout.buildDirectory.file(
     'test-results/gameTest/TEST-levelledmobs-apotheosis-gametest.xml'
 )

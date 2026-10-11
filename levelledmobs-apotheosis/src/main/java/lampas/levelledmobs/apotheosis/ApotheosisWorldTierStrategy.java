@@ -20,9 +20,12 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Assigns a persistent LevelledMobs level from an immutable managed creation
- * context, with the standalone Apotheosis nearest-player behavior retained
- * when no external provider is installed.
+ * Assigns a LevelledMobs level from the managed creation context, with the
+ * standalone Apotheosis nearest-player behavior retained when no external
+ * provider is installed. For a managed mob the level follows the tier and
+ * bounds of its current creation context. When that context changes, the core
+ * relevel path asks {@link #constrainLevel} whether the stored level is still
+ * inside the band and re-levels the mob only when it is not.
  */
 public final class ApotheosisWorldTierStrategy implements LevelStrategy {
     public static final ApotheosisWorldTierStrategy INSTANCE = new ApotheosisWorldTierStrategy();
@@ -83,9 +86,9 @@ public final class ApotheosisWorldTierStrategy implements LevelStrategy {
         }
         IntRange ruleRange = rule.levelRange();
 
-        // A managed mob gets one immutable creation context from Yggdrasil.
-        // Never replace it with an unlimited nearest-player query: that would
-        // let movement or a later cap change reroll an existing encounter.
+        // A managed mob takes its tier and bounds from the Yggdrasil creation
+        // context. Never replace it with an unlimited nearest-player query:
+        // that would let a player's movement reroll the encounter.
         if (context != null && context.entity() instanceof Mob mob &&
             TierContextBridge.installed() && TierContextBridge.managed(mob)) {
             Optional<TierContextBridge.CreationContext> creation = TierContextBridge.creation(mob);

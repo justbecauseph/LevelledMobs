@@ -7,11 +7,13 @@ import lampas.levelledmobs.events.CombatHandler;
 import lampas.levelledmobs.rules.EffectiveRule;
 import lampas.levelledmobs.rules.IntRange;
 import lampas.levelledmobs.rules.LevelRule;
+import lampas.levelledmobs.testsupport.TestMobs;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import org.junit.jupiter.api.BeforeAll;
@@ -88,21 +90,41 @@ public class AttributeScalingTest {
 
     @Test
     public void testHealthPolicyPreserveRatio() {
-        // Mock health logic: base HP = 20, damaged to 10 (50% ratio).
-        // Max HP increases to 40 at level 10.
-        // PRESERVE_RATIO should set new HP to 50% of 40 = 20.
-        float prevHealth = 10.0f;
-        float prevMaxHealth = 20.0f;
-        float newMaxHealth = 40.0f;
+        TestMobs.TestMonster mob = TestMobs.monster();
+        AttributeInstance maxHealth = mob.getAttribute(AttributeDefinition.MAX_HEALTH.attribute());
+        assertNotNull(maxHealth);
+        maxHealth.setBaseValue(20.0);
 
-        float ratio = prevHealth / prevMaxHealth;
-        float expectedPreservedHealth = newMaxHealth * ratio;
-        assertEquals(20.0f, expectedPreservedHealth);
+        // Downgrade: 10/20 (50%) becomes 10/10 after a -10 modifier. The ratio is kept: 5/10.
+        mob.setHealth(10.0f);
+        setHealthModifier(maxHealth, -10.0);
+        HealthPolicy.PRESERVE_RATIO.apply(mob, 10.0f, 20.0f);
+        assertEquals(10.0f, mob.getMaxHealth(), 1e-4f);
+        assertEquals(5.0f, mob.getHealth(), 1e-4f, "Downgrade must keep the 50% ratio");
 
-        // If mob was full health (20/20), it should be full health (40/40)
-        float fullPrev = 20.0f;
-        float fullRatio = fullPrev / prevMaxHealth;
-        assertEquals(40.0f, newMaxHealth * fullRatio);
+        // Upgrade: 5/10 (50%) becomes 20/40 after the modifier is +20 (base 20 + 20). The ratio is kept.
+        setHealthModifier(maxHealth, 20.0);
+        HealthPolicy.PRESERVE_RATIO.apply(mob, 5.0f, 10.0f);
+        assertEquals(40.0f, mob.getMaxHealth(), 1e-4f);
+        assertEquals(20.0f, mob.getHealth(), 1e-4f, "Upgrade must keep the 50% ratio");
+
+        // Full health stays full through a max-health increase: 40/40 becomes 80/80 (modifier +60).
+        setHealthModifier(maxHealth, 60.0);
+        HealthPolicy.PRESERVE_RATIO.apply(mob, 40.0f, 40.0f);
+        assertEquals(80.0f, mob.getHealth(), 1e-4f, "A mob at full health must snap to the new full health");
+
+        // The floor: at 1/80 a 2 max-health mob would keep 0.025 HP, so the result is floored at 1.0 (modifier -18).
+        setHealthModifier(maxHealth, -18.0);
+        HealthPolicy.PRESERVE_RATIO.apply(mob, 1.0f, 80.0f);
+        assertEquals(2.0f, mob.getMaxHealth(), 1e-4f);
+        assertEquals(1.0f, mob.getHealth(), 1e-4f, "A damaged mob must never be floored below 1 HP");
+    }
+
+    /** Replaces the LevelledMobs max-health modifier with one of the given amount. */
+    private static void setHealthModifier(AttributeInstance instance, double amount) {
+        instance.removeModifier(AttributeDefinition.MAX_HEALTH.modifierId());
+        instance.addPermanentModifier(new AttributeModifier(
+            AttributeDefinition.MAX_HEALTH.modifierId(), amount, AttributeModifier.Operation.ADD_VALUE));
     }
 
     @Test
