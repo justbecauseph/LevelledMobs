@@ -310,7 +310,9 @@ public class MobLevelingService {
     }
 
     /**
-     * Manually sets an entity's level and reapplies all scaling and nametag updates.
+     * Manually sets an entity's level and reapplies all scaling and nametag updates. The level is used as given, and
+     * the attribute values come from the entity's matching rule, resolved as the levelling path does, or from the
+     * defaults when no rule matches.
      */
     public void setLevel(LivingEntity entity, int level, String ruleSet) {
         if (!(entity instanceof LevelledMobHolder holder)) {
@@ -325,7 +327,9 @@ public class MobLevelingService {
                 ? current.groupFactor()
                 : initialGroupFactor(entity);
 
-            List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, null);
+            RuleResult result = ruleManager.resolve(MobContext.of(entity, SpawnReasonResolver.infer(entity, SpawnReason.NATURAL)));
+            EffectiveRule rule = result.matched() ? result.effectiveRule() : null;
+            List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, rule);
             attributeService.applyModifiers(entity, effectiveModifiers, groupFactor, HealthPolicy.PRESERVE_RATIO);
 
             LevelledMobData newData = LevelledMobData.of(level, ruleSet != null ? ruleSet : "manual")

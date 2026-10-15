@@ -10,7 +10,8 @@
       "lampas.levelledmobs.apotheosis.gametest.ManagedWorldTierRelevelGameTests",
       "lampas.levelledmobs.apotheosis.gametest.DeathXpGameTests",
       "lampas.levelledmobs.apotheosis.gametest.BossLevellingGameTests",
-      "lampas.levelledmobs.apotheosis.gametest.RangedDamageGameTests"
+      "lampas.levelledmobs.apotheosis.gametest.RangedDamageGameTests",
+      "lampas.levelledmobs.apotheosis.gametest.AdminLevelGameTests"
     ]
   },
   "depends": {
