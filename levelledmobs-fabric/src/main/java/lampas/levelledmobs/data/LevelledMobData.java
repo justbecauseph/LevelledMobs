@@ -14,13 +14,17 @@ public record LevelledMobData(
     long generatedAt,
     int retentionVersion,
     List<LevelledMobModifier> effectiveModifiers,
-    boolean quarantined
+    boolean quarantined,
+    double groupFactor
 ) {
     /** Version of the effective modifier representation written to entity data. */
     public static final int CURRENT_RETENTION_VERSION = 1;
 
     /** Hard bound for data read from an entity, including malformed external data. */
     public static final int MAX_PERSISTED_MODIFIERS = 16;
+
+    /** Group factor of a mob that is not a multi-party boss: its max health is not multiplied. */
+    public static final double NO_GROUP_FACTOR = 1.0;
 
     public static final LevelledMobData EMPTY = new LevelledMobData(0, false, "none", 0L, 0, List.of(), false);
 
@@ -31,6 +35,8 @@ public record LevelledMobData(
             ? new ArrayList<>()
             : new ArrayList<>(effectiveModifiers.subList(0, Math.min(effectiveModifiers.size(), MAX_PERSISTED_MODIFIERS)));
         effectiveModifiers = Collections.unmodifiableList(bounded);
+        // Malformed external data must never shrink or blow up a mob's health.
+        groupFactor = (Double.isFinite(groupFactor) && groupFactor >= NO_GROUP_FACTOR) ? groupFactor : NO_GROUP_FACTOR;
     }
 
     /** Backward-compatible constructor for callers that only have legacy metadata. */
@@ -50,6 +56,19 @@ public record LevelledMobData(
         this(level, levelled, ruleSet, generatedAt, retentionVersion, effectiveModifiers, false);
     }
 
+    /** Backward-compatible constructor for callers that predate the boss group factor. */
+    public LevelledMobData(
+        int level,
+        boolean levelled,
+        String ruleSet,
+        long generatedAt,
+        int retentionVersion,
+        List<LevelledMobModifier> effectiveModifiers,
+        boolean quarantined
+    ) {
+        this(level, levelled, ruleSet, generatedAt, retentionVersion, effectiveModifiers, quarantined, NO_GROUP_FACTOR);
+    }
+
     public static LevelledMobData of(int level, String ruleSet) {
         // The effective plan is attached by MobLevelingService after the rule is resolved.
         return new LevelledMobData(level, true, ruleSet, System.currentTimeMillis(), 0, List.of(), false);
@@ -63,7 +82,8 @@ public record LevelledMobData(
             generatedAt,
             CURRENT_RETENTION_VERSION,
             modifiers,
-            quarantined
+            quarantined,
+            groupFactor
         );
     }
 
@@ -79,7 +99,8 @@ public record LevelledMobData(
             generatedAt,
             CURRENT_RETENTION_VERSION,
             modifiers,
-            quarantined
+            quarantined,
+            groupFactor
         );
     }
 
@@ -91,7 +112,25 @@ public record LevelledMobData(
             generatedAt,
             retentionVersion,
             effectiveModifiers,
-            quarantined
+            quarantined,
+            groupFactor
+        );
+    }
+
+    /**
+     * Sets the multi-party boss factor on max health. It is fixed when the boss is first levelled and kept by
+     * restores and relevels.
+     */
+    public LevelledMobData withGroupFactor(double factor) {
+        return new LevelledMobData(
+            level,
+            levelled,
+            ruleSet,
+            generatedAt,
+            retentionVersion,
+            effectiveModifiers,
+            quarantined,
+            factor
         );
     }
 

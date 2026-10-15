@@ -15,7 +15,8 @@ import lampas.levelledmobs.rules.strategy.LevelStrategy;
 import lampas.levelledmobs.rules.strategy.StrategyRegistry;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.cubemob.AbstractCubeMob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,15 @@ public class MobLevelingService {
         this.nametagService = nametagService;
         this.bossClassifier = bossClassifier != null ? bossClassifier : new BossClassifier();
         this.strategies = strategies != null ? strategies : StrategyRegistry.INSTANCE;
+    }
+
+    /**
+     * True for the mob types LevelledMobs levels: hostile {@link Enemy} mobs, which include ghasts, phantoms,
+     * shulkers, hoglins and the Ender Dragon. Slimes and magma cubes are excluded because they split on death.
+     * Callers also skip babies.
+     */
+    public static boolean isLevellableType(LivingEntity entity) {
+        return entity instanceof Enemy && !(entity instanceof AbstractCubeMob);
     }
 
     /**
@@ -128,7 +138,7 @@ public class MobLevelingService {
         MobContext context = MobContext.of(entity, effectiveReason);
         RuleResult result = ruleManager.resolve(context);
 
-        if (result.matched() && entity instanceof Monster && !entity.isBaby()) {
+        if (result.matched() && isLevellableType(entity) && !entity.isBaby()) {
             EffectiveRule rule = result.effectiveRule();
             LevelStrategy strategy = strategies.resolveStrategy(rule.strategyName(), context, rule);
 
@@ -177,11 +187,14 @@ public class MobLevelingService {
                 return;
             }
 
+            double groupFactor = initialGroupFactor(entity);
+
             List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, rule);
-            attributeService.applyModifiers(entity, effectiveModifiers, HealthPolicy.FRESH_SPAWN);
+            attributeService.applyModifiers(entity, effectiveModifiers, groupFactor, HealthPolicy.FRESH_SPAWN);
 
             LevelledMobData newData = LevelledMobData.of(level, rule.primaryRuleId())
-                .withEffectiveModifiers(effectiveModifiers);
+                .withEffectiveModifiers(effectiveModifiers)
+                .withGroupFactor(groupFactor);
             holder.lampas$setLevelData(newData);
             nametagService.updateNametag(entity, level, rule.primaryRuleId());
 
@@ -232,7 +245,7 @@ public class MobLevelingService {
         if (data == null || !data.levelled() || data.quarantined() || isAdminSet(data.ruleSet())) {
             return RelevelOutcome.UNCHANGED;
         }
-        if (!(entity instanceof Monster) || entity.isBaby()) {
+        if (!isLevellableType(entity) || entity.isBaby()) {
             return RelevelOutcome.UNCHANGED;
         }
         if (lampas.levelledmobs.compatibility.ModdedMobHandler.getPredefinedLevel(entity).isPresent()) {
@@ -272,7 +285,7 @@ public class MobLevelingService {
         }
 
         List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(newLevel, rule);
-        attributeService.applyModifiers(entity, effectiveModifiers, HealthPolicy.PRESERVE_RATIO);
+        attributeService.applyModifiers(entity, effectiveModifiers, data.groupFactor(), HealthPolicy.PRESERVE_RATIO);
         holder.lampas$setLevelData(data.withRelevel(newLevel, effectiveModifiers));
         nametagService.updateNametag(entity, newLevel, data.ruleSet());
 
@@ -280,6 +293,16 @@ public class MobLevelingService {
             entity.getType().getDescription().getString(), entity.getUUID(), currentLevel, newLevel,
             strategy.name(), data.ruleSet());
         return RelevelOutcome.CHANGED;
+    }
+
+    /**
+     * The group factor for a mob being levelled for the first time. Bosses are tuned for two full parties, so more
+     * players around a boss when it is levelled add max health. Other mobs get none.
+     */
+    private double initialGroupFactor(LivingEntity entity) {
+        return bossClassifier.isBoss(entity)
+            ? BossScaling.groupFactor(BossScaling.countNearbyPlayers(entity))
+            : LevelledMobData.NO_GROUP_FACTOR;
     }
 
     private static boolean isAdminSet(String ruleSet) {
@@ -295,11 +318,19 @@ public class MobLevelingService {
         }
 
         if (level > 0) {
+            // An admin-set level keeps the group factor a boss was first levelled with; a boss levelled here for the
+            // first time, for example by /lm summon, counts the players around it.
+            LevelledMobData current = holder.lampas$getLevelData();
+            double groupFactor = (current != null && current.levelled())
+                ? current.groupFactor()
+                : initialGroupFactor(entity);
+
             List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, null);
-            attributeService.applyModifiers(entity, effectiveModifiers, HealthPolicy.PRESERVE_RATIO);
+            attributeService.applyModifiers(entity, effectiveModifiers, groupFactor, HealthPolicy.PRESERVE_RATIO);
 
             LevelledMobData newData = LevelledMobData.of(level, ruleSet != null ? ruleSet : "manual")
-                .withEffectiveModifiers(effectiveModifiers);
+                .withEffectiveModifiers(effectiveModifiers)
+                .withGroupFactor(groupFactor);
             holder.lampas$setLevelData(newData);
             nametagService.updateNametag(entity, level);
         } else {
@@ -311,6 +342,10 @@ public class MobLevelingService {
 
     public RuleManager getRuleManager() {
         return ruleManager;
+    }
+
+    public BossClassifier getBossClassifier() {
+        return bossClassifier;
     }
 
     /** Restores a converted entity from its persisted outcome without rerolling current rules. */

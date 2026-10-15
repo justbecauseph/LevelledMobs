@@ -10,6 +10,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeMap;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.item.ItemStack;
@@ -56,6 +57,20 @@ public final class TestMobs {
             return mob;
         } catch (ReflectiveOperationException ex) {
             throw new IllegalStateException("Could not allocate a test monster", ex);
+        }
+    }
+
+    /**
+     * Allocates a vanilla mob class with only its attribute map set, for checks that read the class and its
+     * attributes. No constructor runs.
+     */
+    public static <T extends LivingEntity> T allocate(Class<T> type, AttributeSupplier attributes) {
+        try {
+            T mob = type.cast(unsafe().allocateInstance(type));
+            setField(LivingEntity.class, mob, "attributes", new AttributeMap(attributes));
+            return mob;
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Could not allocate a test " + type.getSimpleName(), ex);
         }
     }
 

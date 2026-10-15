@@ -41,6 +41,9 @@ public abstract class LivingEntityMixin implements LevelledMobHolder {
                 output.putString("lampas:rule", this.lampas$levelData.ruleSet());
             }
             output.putLong("lampas:generated_at", this.lampas$levelData.generatedAt());
+            if (this.lampas$levelData.groupFactor() != LevelledMobData.NO_GROUP_FACTOR) {
+                output.putDouble("lampas:group_factor", this.lampas$levelData.groupFactor());
+            }
             if (this.lampas$levelData.hasPersistedModifiers()) {
                 output.putInt("lampas:retention_version", this.lampas$levelData.retentionVersion());
                 var modifiers = output.childrenList("lampas:effective_modifiers");
@@ -78,7 +81,9 @@ public abstract class LivingEntityMixin implements LevelledMobHolder {
                     child.getStringOr("operation", "")
                 ));
             }
-            this.lampas$levelData = new LevelledMobData(level, levelled, rule, generatedAt, retentionVersion, modifiers, quarantined);
+            double groupFactor = input.getDoubleOr("lampas:group_factor", LevelledMobData.NO_GROUP_FACTOR);
+            this.lampas$levelData = new LevelledMobData(level, levelled, rule, generatedAt, retentionVersion, modifiers,
+                quarantined, groupFactor);
         }
     }
 }

@@ -91,6 +91,28 @@ public class LevelledMobDataTest {
     }
 
     @Test
+    public void groupFactorDefaultsToOneAndSurvivesEveryCopy() {
+        assertEquals(1.0, LevelledMobData.EMPTY.groupFactor());
+        assertEquals(1.0, LevelledMobData.of(5, "rule").groupFactor());
+        assertEquals(1.0, new LevelledMobData(5, true, "rule", 1L, 0, List.of(), false).groupFactor());
+
+        LevelledMobData boss = LevelledMobData.of(20, "boss").withGroupFactor(1.5);
+        List<LevelledMobModifier> plan = List.of(new LevelledMobModifier("max_health", "lampas:levelled/max_health", 1.0, "add_value"));
+        assertEquals(1.5, boss.groupFactor());
+        assertEquals(1.5, boss.withEffectiveModifiers(plan).groupFactor());
+        assertEquals(1.5, boss.withRelevel(30, plan).groupFactor());
+        assertEquals(1.5, boss.withQuarantined(true).groupFactor());
+    }
+
+    @Test
+    public void malformedGroupFactorFallsBackToOne() {
+        assertEquals(1.0, LevelledMobData.of(5, "rule").withGroupFactor(Double.NaN).groupFactor());
+        assertEquals(1.0, LevelledMobData.of(5, "rule").withGroupFactor(Double.POSITIVE_INFINITY).groupFactor());
+        assertEquals(1.0, LevelledMobData.of(5, "rule").withGroupFactor(0.5).groupFactor());
+        assertEquals(1.0, LevelledMobData.of(5, "rule").withGroupFactor(-2.0).groupFactor());
+    }
+
+    @Test
     public void testLegacyMetadataDoesNotClaimEffectivePlan() {
         LevelledMobData legacy = new LevelledMobData(27, true, "old_rule", 1L);
 

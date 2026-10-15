@@ -21,6 +21,18 @@ public abstract class LivingEntityCombatMixin {
         return CombatHandler.modifyDamage((LivingEntity) (Object) this, damageSource, amount);
     }
 
+    // Player overrides actuallyHurt without calling super, so boss damage is scaled on hurtServer, which every
+    // player and mob hurt reaches.
+    @ModifyVariable(
+        method = "hurtServer",
+        at = @At("HEAD"),
+        argsOnly = true,
+        ordinal = 0
+    )
+    private float lampas$modifyBossDamage(float amount, ServerLevel level, DamageSource damageSource) {
+        return CombatHandler.modifyBossDamage(damageSource, amount);
+    }
+
     @org.spongepowered.asm.mixin.injection.Inject(
         method = "actuallyHurt",
         at = @At("TAIL")

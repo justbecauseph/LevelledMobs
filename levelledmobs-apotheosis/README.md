@@ -42,6 +42,34 @@ Explicit inclusive bands can override the automatic partition:
 
 All five bands are required when overriding them. Bands must be ordered, non-overlapping, and inside the rule's `min_level` and `max_level`. Invalid strategy configuration safely uses the rule minimum and logs one warning for that rule/configuration.
 
+## Mobs that are levelled
+
+LevelledMobs Fabric levels adult hostile mobs, meaning every mob that implements `Enemy`: all `Monster` subclasses plus ghasts, phantoms, shulkers, hoglins and the Ender Dragon. Slimes and magma cubes are never levelled because they split on death. Babies are skipped. The managed re-tier listener applies the same filter.
+
+## Bosses
+
+The Ender Dragon, Wither, Warden, Elder Guardian and anything tagged `c:bosses` or `fabric:bosses` are levelled only when `allowBossLeveling` is `true` in `settings.json`. The setting is applied on start-up and on `/lm reload`. A boss rule gives them their own health per level while the tier rule keeps setting the level band:
+
+```json
+"boss_scaling": {
+  "priority": 50,
+  "conditions": {
+    "entities": {
+      "include": ["minecraft:ender_dragon", "minecraft:wither", "minecraft:warden", "minecraft:elder_guardian"],
+      "include-tags": ["c:bosses", "fabric:bosses"]
+    }
+  },
+  "attributes": { "max_health": 290 }
+}
+```
+
+Bosses are tuned for two full parties of five:
+
+- **Group factor.** When a boss is levelled, its max health is multiplied by max(10, n) / 10, where n is the number of non-spectator players in its dimension within 128 blocks. Up to ten players face the ten-player boss; fifteen players face 1.5 times its health. The factor is a separate `lampas:levelled/group_factor` modifier (`add_multiplied_total`), saved with the mob as `lampas:group_factor`, and kept on chunk reload, managed relevel and `/lm level`. A boss first levelled by `/lm summon` or `/lm level` counts the players around it the same way. Players who arrive after the boss is levelled do not change it.
+- **Damage.** Most boss attacks deal fixed amounts that `attack_damage` never reaches: the Wither's skulls and explosions, the Ender Dragon's head, wings and breath, the Warden's sonic boom, and the Elder Guardian's beam and spikes. A levelled boss's damage of that kind, including damage from projectiles and clouds it owns, is multiplied by 1 + 0.025 × (level − 1) (×5.975 at level 200). This replaces LevelledMobs' projectile and explosion multipliers for that damage. Melee hits from a boss with an `attack_damage` attribute (the Warden's, and the Elder Guardian's hit that follows its beam) already grow through that attribute and are not multiplied again.
+
+Vanilla caps max health at 1024. Boss health above that needs a mod that lifts the cap, such as AttributeFix.
+
 ## Multiplayer and persistence
 
 Apotheosis World Tier is per player. The addon mirrors Apotheosis's monster behavior by using the nearest player anywhere in the mob's dimension. If no player exists in that dimension, the rule minimum is used.
@@ -61,13 +89,13 @@ Loading a mob never relevels it, so edits to the band settings in `rules.json` d
 The sibling Apotheosis checkout does not currently expose a loader-specific Maven coordinate. By default the build verifies and consumes this external Fabric artifact without embedding it:
 
 ```text
-../Apotheosis/fabric/build/libs/Apotheosis-26.2-10.0.0.jar
+../Apotheosis/fabric/build/libs/Apotheosis-26.2-10.0.1.jar
 ```
 
 Override the path without changing tracked files:
 
 ```powershell
-.\gradlew.bat :levelledmobs-apotheosis:build -Papotheosis_fabric_jar=C:\path\to\Apotheosis-26.2-10.0.0.jar
+.\gradlew.bat :levelledmobs-apotheosis:build -Papotheosis_fabric_jar=C:\path\to\Apotheosis-26.2-10.0.1.jar
 ```
 
 The build verifies the JAR's SHA-256, Fabric metadata, mod ID, and version. Override `apotheosis_fabric_sha256` deliberately when validating a newly rebuilt trusted artifact.
@@ -75,11 +103,11 @@ The build verifies the JAR's SHA-256, Fabric metadata, mod ID, and version. Over
 The headless Fabric GameTest also uses the exact sibling Fabric outputs for Apotheosis's hard runtime dependencies:
 
 ```text
-../Placebo/fabric/build/libs/Placebo-26.2-11.0.0.jar
-../Apothic-Attributes/fabric/build/libs/ApothicAttributes-26.2-4.0.0.jar
+../Placebo/fabric/build/libs/Placebo-26.2-11.0.1.jar
+../Apothic-Attributes/fabric/build/libs/ApothicAttributes-26.2-4.0.1.jar
 ```
 
-Their paths can be overridden with `placebo_fabric_jar` and `apothic_attributes_fabric_jar`. The normal addon build runs the seven pure JUnit tests and the owned GameTests:
+Their paths can be overridden with `placebo_fabric_jar` and `apothic_attributes_fabric_jar`. The GameTest runtime also loads Gateways, Apothic Enchanting, Apothic Spawners, Patchouli and Lootr, overridden with `gateways_fabric_jar`, `apothic_enchanting_fabric_jar`, `apothic_spawners_fabric_jar`, `patchouli_fabric_jar` and `lootr_fabric_jar`. The normal addon build runs the seven pure JUnit tests and the owned GameTests:
 
 ```powershell
 .\gradlew.bat :levelledmobs-apotheosis:build
@@ -91,4 +119,4 @@ Run only the live integration test with:
 .\gradlew.bat :levelledmobs-apotheosis:runGameTest
 ```
 
-The GameTests boot Minecraft 26.2 on Fabric. The standalone test verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes. The managed test verifies that a creation-tier change relevels a loaded mob into the new band, with its health kept by ratio. The death-XP tests verify that a levelled mob's experience reward follows the `xp` multiplier merged from its matching rules, and falls back to the global `defaultXpMultiplier` when no matching rule sets one.
+The GameTests boot Minecraft 26.2 on Fabric. The standalone test verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes. The managed test verifies that a creation-tier change relevels a loaded mob into the new band, with its health kept by ratio. The death-XP tests verify that a levelled mob's experience reward follows the `xp` multiplier merged from its matching rules, and falls back to the global `defaultXpMultiplier` when no matching rule sets one. The boss tests verify that phantoms, hoglins and ghasts are levelled and slimes and magma cubes are not; that a Wither and a Warden take the boss rule's health only while `allowBossLeveling` is on; that 1, 10 and 15 nearby players give a group factor of 1, 1 and 1.5, which survives an NBT reload; and that a levelled Wither's skull, Ender Dragon's head, Warden's sonic boom and Elder Guardian's beam deal multiplied damage to mobs and players while the Warden's and Elder Guardian's melee hits are not multiplied again.

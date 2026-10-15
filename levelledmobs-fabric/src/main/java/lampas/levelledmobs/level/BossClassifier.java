@@ -62,8 +62,13 @@ public class BossClassifier {
         return !isBoss(entity);
     }
 
+    /** Set from {@code allowBossLeveling} in settings.json on every config load and reload. */
     public void setAllowBossLeveling(boolean allow) {
         this.allowBossLeveling = allow;
+    }
+
+    public boolean isBossLevelingAllowed() {
+        return allowBossLeveling;
     }
 
     public void addBoss(Identifier entityId) {

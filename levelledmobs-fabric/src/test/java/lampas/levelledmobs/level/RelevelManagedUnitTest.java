@@ -149,6 +149,33 @@ public class RelevelManagedUnitTest {
     }
 
     @Test
+    public void relevelKeepsTheBossGroupFactorAndHealthRatio() {
+        Fixture fixture = new Fixture();
+        fixture.strategy.min = 5;
+        fixture.strategy.max = 10;
+        fixture.strategy.next = 7;
+        TestMobs.TestMonster mob = TestMobs.monster();
+        List<LevelledMobModifier> plan = fixture.attributes.resolveEffectiveModifierPlan(2, fixture.rule);
+        fixture.attributes.applyModifiers(mob, plan, 1.5, HealthPolicy.FRESH_SPAWN);
+        mob.lampas$setLevelData(new LevelledMobData(2, true, RULE_SET, GENERATED_AT,
+            LevelledMobData.CURRENT_RETENTION_VERSION, plan, false, 1.5));
+        // (20 + 2.5) * 1.5 = 33.75; take it to half health.
+        assertEquals(33.75, mob.getMaxHealth(), 1e-4);
+        mob.setHealth(33.75f / 2);
+
+        assertTrue(fixture.service.relevelManaged(mob));
+
+        // Level 7: (20 + 6 * 2.5) * 1.5 = 52.5, still at half health.
+        assertEquals(1.5, mob.lampas$getLevelData().groupFactor(), 1e-9);
+        assertEquals(52.5, mob.getMaxHealth(), 1e-4);
+        assertEquals(52.5 / 2, mob.getHealth(), 1e-4);
+        AttributeModifier group = mob.getAttribute(AttributeDefinition.MAX_HEALTH.attribute())
+            .getModifier(AttributeScalingService.GROUP_FACTOR_MODIFIER_ID);
+        assertNotNull(group, "relevel must keep the group factor modifier");
+        assertEquals(0.5, group.amount(), 1e-9);
+    }
+
+    @Test
     public void relevelUsesMergedRuleRatesNotServiceDefaults() {
         Fixture fixture = new Fixture();
         fixture.strategy.min = 5;

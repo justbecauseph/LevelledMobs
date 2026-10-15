@@ -244,7 +244,8 @@ public class LevelledMobsCommand {
             LevelledMobsModule.getConfigLoader().load(
                 LevelledMobsModule.getRuleManager(),
                 LevelledMobsModule.getNametagService(),
-                LevelledMobsModule.getProcessingQueue()
+                LevelledMobsModule.getProcessingQueue(),
+                LevelledMobsModule.getBossClassifier()
             );
         } else if (LevelledMobsModule.getRuleManager() != null) {
             LevelledMobsModule.getRuleManager().reload();

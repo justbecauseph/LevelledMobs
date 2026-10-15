@@ -23,6 +23,9 @@ public class AttributeScalingService {
 
     public static final net.minecraft.resources.Identifier HEALTH_MODIFIER_ID = AttributeDefinition.MAX_HEALTH.modifierId();
     public static final net.minecraft.resources.Identifier DAMAGE_MODIFIER_ID = AttributeDefinition.ATTACK_DAMAGE.modifierId();
+    /** Multi-party boss factor on max health, kept apart from the level's own max_health modifier. */
+    public static final net.minecraft.resources.Identifier GROUP_FACTOR_MODIFIER_ID =
+        net.minecraft.resources.Identifier.fromNamespaceAndPath("lampas", "levelled/group_factor");
 
     private final Map<String, AttributeFormula> defaultFormulas = new ConcurrentHashMap<>();
     private volatile List<CompiledAttributeModifier> cachedDefaultPlan;
@@ -54,6 +57,10 @@ public class AttributeScalingService {
             if (instance != null && instance.hasModifier(def.modifierId())) {
                 instance.removeModifier(def.modifierId());
             }
+        }
+        AttributeInstance maxHealth = entity.getAttribute(AttributeDefinition.MAX_HEALTH.attribute());
+        if (maxHealth != null && maxHealth.hasModifier(GROUP_FACTOR_MODIFIER_ID)) {
+            maxHealth.removeModifier(GROUP_FACTOR_MODIFIER_ID);
         }
     }
 
@@ -114,8 +121,19 @@ public class AttributeScalingService {
         return List.copyOf(result);
     }
 
-    /** Applies a resolved plan while retaining the existing public scaling API. */
+    /**
+     * Applies a resolved plan while retaining the existing public scaling API. A group factor modifier already on the
+     * entity is left as it is.
+     */
     public void applyModifiers(LivingEntity entity, List<LevelledMobModifier> plan, HealthPolicy healthPolicy) {
+        applyModifiers(entity, plan, Double.NaN, healthPolicy);
+    }
+
+    /**
+     * Applies a resolved plan and a multi-party boss group factor together, so the health policy sees both max
+     * health changes at once. A factor of 1.0 removes the group factor modifier.
+     */
+    public void applyModifiers(LivingEntity entity, List<LevelledMobModifier> plan, double groupFactor, HealthPolicy healthPolicy) {
         if (entity == null || plan == null) return;
         HealthPolicy policy = (healthPolicy != null) ? healthPolicy : HealthPolicy.PRESERVE_RATIO;
 
@@ -125,7 +143,7 @@ public class AttributeScalingService {
                 byKey.putIfAbsent(modifier.attributeKey(), modifier);
             }
         }
-        applyModifierMap(entity, byKey, policy);
+        applyModifierMap(entity, byKey, groupFactor, policy);
     }
 
     /**
@@ -156,13 +174,17 @@ public class AttributeScalingService {
             }
         }
 
-        applyModifierMap(entity, byKey, HealthPolicy.PRESERVE_RATIO);
+        applyModifierMap(entity, byKey, data.groupFactor(), HealthPolicy.PRESERVE_RATIO);
         return true;
     }
 
+    /**
+     * @param groupFactor multi-party boss factor on max health; NaN leaves the group factor modifier untouched
+     */
     private void applyModifierMap(
         LivingEntity entity,
         Map<String, LevelledMobModifier> modifiers,
+        double groupFactor,
         HealthPolicy healthPolicy
     ) {
         float prevHealth = entity.getHealth();
@@ -180,6 +202,14 @@ public class AttributeScalingService {
             applyModifier(instance, def, persisted.amount(), desiredOp);
         }
 
+        if (!Double.isNaN(groupFactor)) {
+            AttributeInstance maxHealth = entity.getAttribute(AttributeDefinition.MAX_HEALTH.attribute());
+            if (maxHealth != null) {
+                applyModifier(maxHealth, GROUP_FACTOR_MODIFIER_ID, groupFactor - 1.0,
+                    AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+            }
+        }
+
         healthPolicy.apply(entity, prevHealth, prevMaxHealth);
 
         if (LOGGER.isDebugEnabled()) {
@@ -194,17 +224,26 @@ public class AttributeScalingService {
         double desiredValue,
         AttributeModifier.Operation desiredOp
     ) {
-        AttributeModifier existing = instance.getModifier(def.modifierId());
+        applyModifier(instance, def.modifierId(), desiredValue, desiredOp);
+    }
+
+    private static void applyModifier(
+        AttributeInstance instance,
+        net.minecraft.resources.Identifier modifierId,
+        double desiredValue,
+        AttributeModifier.Operation desiredOp
+    ) {
+        AttributeModifier existing = instance.getModifier(modifierId);
         if (desiredValue != 0.0) {
             if (existing != null) {
                 if (Double.compare(existing.amount(), desiredValue) == 0 && existing.operation() == desiredOp) {
                     return; // Matching modifier already present; avoid stacking or churn.
                 }
-                instance.removeModifier(def.modifierId());
+                instance.removeModifier(modifierId);
             }
-            instance.addPermanentModifier(new AttributeModifier(def.modifierId(), desiredValue, desiredOp));
+            instance.addPermanentModifier(new AttributeModifier(modifierId, desiredValue, desiredOp));
         } else if (existing != null) {
-            instance.removeModifier(def.modifierId());
+            instance.removeModifier(modifierId);
         }
     }
 

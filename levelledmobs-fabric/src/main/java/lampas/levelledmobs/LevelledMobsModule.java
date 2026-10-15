@@ -4,6 +4,7 @@ import lampas.levelledmobs.attributes.AttributeScalingService;
 import lampas.levelledmobs.command.LevelledMobsCommand;
 import lampas.levelledmobs.events.ChunkLifecycleHandler;
 import lampas.levelledmobs.events.EntityLifecycleHandler;
+import lampas.levelledmobs.level.BossClassifier;
 import lampas.levelledmobs.level.MobLevelingService;
 import lampas.levelledmobs.level.MobProcessingQueue;
 import lampas.levelledmobs.level.RelevelQueue;
@@ -29,6 +30,7 @@ public class LevelledMobsModule implements ModInitializer {
     private RuleManager ruleManager;
     private AttributeScalingService attributeScalingService;
     private NametagService nametagService;
+    private BossClassifier bossClassifier;
     private MobLevelingService mobLevelingService;
     private MobProcessingQueue processingQueue;
     private RelevelQueue relevelQueue;
@@ -42,13 +44,14 @@ public class LevelledMobsModule implements ModInitializer {
         this.ruleManager = new RuleManager();
         this.attributeScalingService = new AttributeScalingService();
         this.nametagService = new NametagService();
-        this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService);
+        this.bossClassifier = new BossClassifier();
+        this.mobLevelingService = new MobLevelingService(ruleManager, attributeScalingService, nametagService, bossClassifier);
         this.processingQueue = new MobProcessingQueue(mobLevelingService);
         this.relevelQueue = new RelevelQueue(mobLevelingService);
 
         // Load configuration and rules
         this.configLoader = new lampas.levelledmobs.config.ConfigLoader();
-        this.configLoader.load(ruleManager, nametagService, processingQueue);
+        this.configLoader.load(ruleManager, nametagService, processingQueue, bossClassifier);
 
         // Register lifecycle event handlers
         new EntityLifecycleHandler(processingQueue).register();
@@ -85,6 +88,10 @@ public class LevelledMobsModule implements ModInitializer {
 
     public static AttributeScalingService getAttributeScalingService() {
         return instance != null ? instance.attributeScalingService : null;
+    }
+
+    public static BossClassifier getBossClassifier() {
+        return instance != null ? instance.bossClassifier : null;
     }
 
     public static NametagService getNametagService() {

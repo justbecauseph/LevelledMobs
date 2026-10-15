@@ -1,6 +1,7 @@
 package lampas.levelledmobs.config;
 
 import lampas.levelledmobs.config.legacy.LegacyLevelledMobsConfigImporter;
+import lampas.levelledmobs.level.BossClassifier;
 import lampas.levelledmobs.nametag.NametagVisibility;
 import lampas.levelledmobs.rules.LevelRule;
 import lampas.levelledmobs.rules.RuleManager;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -37,6 +39,28 @@ public class ConfigSystemUnitTest {
 
         assertTrue(tempDir.resolve("settings.json").toFile().exists());
         assertTrue(tempDir.resolve("rules.json").toFile().exists());
+    }
+
+    @Test
+    public void allowBossLevelingReachesTheBossClassifierOnLoadAndReload(@TempDir Path tempDir) throws Exception {
+        ConfigLoader loader = new ConfigLoader(tempDir);
+        BossClassifier classifier = new BossClassifier();
+        Path settings = tempDir.resolve("settings.json");
+
+        // First load writes the defaults, which keep bosses unlevelled.
+        loader.load(new RuleManager(), null, null, classifier);
+        assertFalse(classifier.isBossLevelingAllowed());
+
+        Files.writeString(settings, Files.readString(settings)
+            .replace("\"allowBossLeveling\": false", "\"allowBossLeveling\": true"));
+        loader.load(new RuleManager(), null, null, classifier);
+        assertTrue(loader.getCurrentConfig().allowBossLeveling());
+        assertTrue(classifier.isBossLevelingAllowed(), "a load must pass allowBossLeveling to the classifier");
+
+        Files.writeString(settings, Files.readString(settings)
+            .replace("\"allowBossLeveling\": true", "\"allowBossLeveling\": false"));
+        loader.load(new RuleManager(), null, null, classifier);
+        assertFalse(classifier.isBossLevelingAllowed(), "a reload must pass allowBossLeveling to the classifier");
     }
 
     @Test

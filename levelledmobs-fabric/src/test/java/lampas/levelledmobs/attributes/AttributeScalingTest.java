@@ -435,4 +435,52 @@ public class AttributeScalingTest {
             .withEffectiveModifiers(malformed);
         assertFalse(service.restorePersistedModifiers(null, invalid));
     }
+    @Test
+    public void groupFactorMultipliesMaxHealthUnderItsOwnModifier() {
+        AttributeScalingService service = new AttributeScalingService();
+        TestMobs.TestMonster mob = TestMobs.monster();
+        // Level 11 under the default +2.0 max health per level: 20 + 10 * 2.0 = 40 before the factor.
+        List<LevelledMobModifier> plan = service.resolveEffectiveModifierPlan(11, null);
+
+        service.applyModifiers(mob, plan, 1.5, HealthPolicy.FRESH_SPAWN);
+
+        AttributeInstance maxHealth = mob.getAttribute(Attributes.MAX_HEALTH);
+        assertEquals(60.0, mob.getMaxHealth(), 1e-4);
+        assertEquals(60.0, mob.getHealth(), 1e-4);
+        assertEquals(20.0, maxHealth.getModifier(AttributeScalingService.HEALTH_MODIFIER_ID).amount(), 1e-9);
+        AttributeModifier group = maxHealth.getModifier(AttributeScalingService.GROUP_FACTOR_MODIFIER_ID);
+        assertNotNull(group);
+        assertEquals("lampas:levelled/group_factor", AttributeScalingService.GROUP_FACTOR_MODIFIER_ID.toString());
+        assertEquals(0.5, group.amount(), 1e-9);
+        assertEquals(AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL, group.operation());
+
+        // The plan-only overload leaves an existing factor alone.
+        service.applyModifiers(mob, plan, HealthPolicy.PRESERVE_RATIO);
+        assertEquals(60.0, mob.getMaxHealth(), 1e-4);
+
+        // A factor of 1.0 removes the modifier, and so does removeModifiers.
+        service.applyModifiers(mob, plan, 1.0, HealthPolicy.PRESERVE_RATIO);
+        assertNull(maxHealth.getModifier(AttributeScalingService.GROUP_FACTOR_MODIFIER_ID));
+        assertEquals(40.0, mob.getMaxHealth(), 1e-4);
+        service.applyModifiers(mob, plan, 1.5, HealthPolicy.PRESERVE_RATIO);
+        service.removeModifiers(mob);
+        assertNull(maxHealth.getModifier(AttributeScalingService.GROUP_FACTOR_MODIFIER_ID));
+        assertEquals(20.0, mob.getMaxHealth(), 1e-4);
+    }
+
+    @Test
+    public void restoreReappliesThePersistedGroupFactorAndKeepsHealthByRatio() {
+        AttributeScalingService service = new AttributeScalingService();
+        TestMobs.TestMonster mob = TestMobs.monster();
+        List<LevelledMobModifier> plan = service.resolveEffectiveModifierPlan(11, null);
+        service.applyModifiers(mob, plan, HealthPolicy.FRESH_SPAWN);
+        mob.setHealth(20.0f);
+        LevelledMobData data = LevelledMobData.of(11, "boss").withEffectiveModifiers(plan).withGroupFactor(1.5);
+
+        assertTrue(service.restorePersistedModifiers(mob, data));
+
+        // 40 max at half health becomes 60 max at half health.
+        assertEquals(60.0, mob.getMaxHealth(), 1e-4);
+        assertEquals(30.0, mob.getHealth(), 1e-4);
+    }
 }

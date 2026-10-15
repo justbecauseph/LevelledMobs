@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lampas.levelledmobs.drops.DropScalingService;
 import lampas.levelledmobs.drops.XpScalingService;
+import lampas.levelledmobs.level.BossClassifier;
 import lampas.levelledmobs.level.MobProcessingQueue;
 import lampas.levelledmobs.nametag.NametagService;
 import lampas.levelledmobs.rules.LevelRule;
@@ -44,6 +45,19 @@ public class ConfigLoader {
      * Initializes configuration directory, generates defaults if missing, and loads settings.
      */
     public void load(RuleManager ruleManager, NametagService nametagService, MobProcessingQueue queue) {
+        load(ruleManager, nametagService, queue, null);
+    }
+
+    /**
+     * Loads configuration as {@link #load(RuleManager, NametagService, MobProcessingQueue)} does and also passes
+     * {@code allowBossLeveling} to the boss classifier.
+     */
+    public void load(
+        RuleManager ruleManager,
+        NametagService nametagService,
+        MobProcessingQueue queue,
+        BossClassifier bossClassifier
+    ) {
         try {
             File dir = configDir.toFile();
             if (!dir.exists()) {
@@ -80,6 +94,9 @@ public class ConfigLoader {
             if (nametagService != null) {
                 nametagService.setTemplate(currentConfig.nametagTemplate());
                 nametagService.setVisibility(currentConfig.nametagVisibility());
+            }
+            if (bossClassifier != null) {
+                bossClassifier.setAllowBossLeveling(currentConfig.allowBossLeveling());
             }
             XpScalingService.setMultiplierPerLevel(currentConfig.defaultXpMultiplier());
             DropScalingService.setItemDropMultiplierPerLevel(currentConfig.defaultDropMultiplier());
