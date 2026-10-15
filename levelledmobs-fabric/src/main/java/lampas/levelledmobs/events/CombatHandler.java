@@ -5,8 +5,8 @@ import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
 import lampas.levelledmobs.level.BossClassifier;
 import lampas.levelledmobs.level.BossScaling;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -21,6 +21,10 @@ public class CombatHandler {
     /**
      * Calculates the adjusted damage amount based on the attacker's level and damage source type.
      * Note: Direct melee attack damage is NOT modified here to prevent double-scaling with Attributes.ATTACK_DAMAGE.
+     *
+     * <p>Damage caused by a levelled boss, or by a projectile or cloud it owns, is multiplied by
+     * 1 + 0.025 * (level - 1) instead, unless the amount was read from the boss's attack_damage (see
+     * {@link BossScaling#isAttackDamageHit}). It replaces the projectile and explosion multipliers for that damage.</p>
      */
     public static float modifyDamage(LivingEntity victim, DamageSource source, float originalDamage) {
         if (originalDamage <= 0 || source == null) {
@@ -30,9 +34,9 @@ public class CombatHandler {
         Entity attacker = source.getEntity();
         Entity directEntity = source.getDirectEntity();
 
-        // modifyBossDamage already scaled this boss damage.
-        if (bossDamageLevel(source) > 1) {
-            return originalDamage;
+        int bossLevel = bossDamageLevel(source);
+        if (bossLevel > 1) {
+            return originalDamage * (float) BossScaling.damageMultiplier(bossLevel);
         }
 
         // 1. Check for projectile attacks (e.g. arrow, fireball, thrown trident)
@@ -46,8 +50,9 @@ public class CombatHandler {
             }
         }
 
-        // 2. Check for explosions caused by levelled mobs (e.g. Creepers)
-        if (source.is(DamageTypes.EXPLOSION) && attacker instanceof LivingEntity livingAttacker) {
+        // 2. Check for explosions caused by levelled mobs (e.g. Creepers). A mob's blast has both a direct and a causing
+        // entity, which makes it player_explosion rather than explosion, so match the whole is_explosion tag.
+        if (source.is(DamageTypeTags.IS_EXPLOSION) && attacker instanceof LivingEntity livingAttacker) {
             if (livingAttacker instanceof LevelledMobHolder holder) {
                 LevelledMobData data = holder.lampas$getLevelData();
                 if (data != null && data.level() > 1) {
@@ -59,19 +64,6 @@ public class CombatHandler {
 
         // Direct melee or other damages remain unmodified to prevent double-multiplying
         return originalDamage;
-    }
-
-    /**
-     * Multiplies damage caused by a levelled boss, or by a projectile or cloud it owns, by 1 + 0.025 * (level - 1)
-     * unless the amount was read from the boss's attack_damage (see {@link BossScaling#isAttackDamageHit}). It
-     * replaces the projectile and explosion multipliers for that damage.
-     */
-    public static float modifyBossDamage(DamageSource source, float amount) {
-        if (amount <= 0 || source == null) {
-            return amount;
-        }
-        int level = bossDamageLevel(source);
-        return (level > 1) ? amount * (float) BossScaling.damageMultiplier(level) : amount;
     }
 
     /** The level of the levelled boss that caused this fixed-amount damage, or 0 when the boss multiplier does not apply. */
