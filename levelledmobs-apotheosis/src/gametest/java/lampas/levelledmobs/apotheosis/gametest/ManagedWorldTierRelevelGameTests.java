@@ -14,6 +14,8 @@ import lampas.levelledmobs.apotheosis.ApotheosisWorldTierStrategy;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Mob;
@@ -119,6 +121,8 @@ public final class ManagedWorldTierRelevelGameTests {
             null
         );
         zombie.setBaby(false);
+        // A daylight sun-burn tick during the re-tier wait would change the health ratio under test.
+        zombie.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, MobEffectInstance.INFINITE_DURATION));
         helper.assertTrue(helper.getLevel().addFreshEntity(zombie),
             "the natural-spawn test zombie could not be added to the level");
         return zombie;
