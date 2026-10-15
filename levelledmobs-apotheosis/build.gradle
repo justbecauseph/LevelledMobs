@@ -253,8 +253,8 @@ test {
     useJUnitPlatform()
 }
 
-// Both World Tier GameTests: the standalone nearest-player test and the managed creation-tier re-tier test.
-def ownedGameTestName = 'levelledmobs-apotheosis-gametest:*world_tier*'
+// Every GameTest this addon owns: the World Tier levelling tests and the death-XP tests.
+def ownedGameTestName = 'levelledmobs-apotheosis-gametest:*'
 def gameTestReportFile = layout.buildDirectory.file(
     'test-results/gameTest/TEST-levelledmobs-apotheosis-gametest.xml'
 )

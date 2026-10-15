@@ -79,7 +79,7 @@ The headless Fabric GameTest also uses the exact sibling Fabric outputs for Apot
 ../Apothic-Attributes/fabric/build/libs/ApothicAttributes-26.2-4.0.0.jar
 ```
 
-Their paths can be overridden with `placebo_fabric_jar` and `apothic_attributes_fabric_jar`. The normal addon build runs the seven pure JUnit tests and the owned GameTest:
+Their paths can be overridden with `placebo_fabric_jar` and `apothic_attributes_fabric_jar`. The normal addon build runs the seven pure JUnit tests and the owned GameTests:
 
 ```powershell
 .\gradlew.bat :levelledmobs-apotheosis:build
@@ -91,4 +91,4 @@ Run only the live integration test with:
 .\gradlew.bat :levelledmobs-apotheosis:runGameTest
 ```
 
-The GameTests boot Minecraft 26.2 on Fabric. The standalone test verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes. The managed test verifies that a creation-tier change relevels a loaded mob into the new band, with its health kept by ratio.
+The GameTests boot Minecraft 26.2 on Fabric. The standalone test verifies nearest-player World Tier selection, entity-load queue processing, unlimited-distance selection, LevelledMobs/Apotheosis modifier coexistence, and persistent levels after a player's tier changes. The managed test verifies that a creation-tier change relevels a loaded mob into the new band, with its health kept by ratio. The death-XP tests verify that a levelled mob's experience reward follows the `xp` multiplier merged from its matching rules, and falls back to the global `defaultXpMultiplier` when no matching rule sets one.
