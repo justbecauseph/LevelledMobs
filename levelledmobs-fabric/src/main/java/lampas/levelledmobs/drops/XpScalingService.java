@@ -29,7 +29,9 @@ public class XpScalingService {
             return calculateXp(baseXp, level);
         }
 
-        double multiplier = getDouble(config.get("xp_multiplier"), multiplierPerLevel);
+        // Rule files write the per-level multiplier as "multiplier" inside their "xp" block.
+        Object multiplierValue = config.containsKey("multiplier") ? config.get("multiplier") : config.get("xp_multiplier");
+        double multiplier = getDouble(multiplierValue, multiplierPerLevel);
         double additive = getDouble(config.get("xp_additive"), 0.0);
         int min = getInt(config.get("min_xp"), minXp);
         int max = getInt(config.get("max_xp"), maxXp);

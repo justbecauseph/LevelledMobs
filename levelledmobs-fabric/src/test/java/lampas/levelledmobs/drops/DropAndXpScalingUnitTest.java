@@ -3,6 +3,9 @@ package lampas.levelledmobs.drops;
 import lampas.levelledmobs.drops.custom.CustomDropItem;
 import lampas.levelledmobs.drops.custom.CustomDropsParser;
 import lampas.levelledmobs.drops.custom.SlidingChance;
+import lampas.levelledmobs.rules.EffectiveRule;
+import lampas.levelledmobs.rules.LevelRule;
+import lampas.levelledmobs.rules.RuleParser;
 import lampas.levelledmobs.rules.strategy.math.MinAndMax;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
@@ -43,6 +46,32 @@ public class DropAndXpScalingUnitTest {
         // Level 5: 10 * (1 + 4 * 0.25) + (4 * 2) = 10 * 2.0 + 8 = 28
         int customLevel5Xp = XpScalingService.calculateXp(10, 5, customConfig);
         assertEquals(28, customLevel5Xp);
+    }
+
+    @Test
+    public void testRuleXpMultiplierKeyFromRulesJson() {
+        // rules.json writes "xp": {"multiplier": 0.05}; level 200: 5 * (1 + 199 * 0.05) = 54.75 -> 55
+        assertEquals(55, XpScalingService.calculateXp(5, 200, Map.of("multiplier", 0.05)));
+    }
+
+    @Test
+    public void testMergedRuleXpSettingsDriveDeathXp() {
+        // Shipped layout: a dimension rule carries xp, the higher-priority tier rule carries none.
+        LevelRule overworld = RuleParser.parseRule("default_overworld", Map.of(
+            "priority", 1,
+            "min_level", 1,
+            "max_level", 50,
+            "xp", Map.of("multiplier", 0.05)
+        ));
+        LevelRule tierRule = RuleParser.parseRule("apotheosis_scaled_mobs", Map.of(
+            "priority", 100,
+            "min_level", 1,
+            "max_level", 200
+        ));
+        EffectiveRule merged = EffectiveRule.merge(List.of(tierRule, overworld));
+
+        // 5 * (1 + 199 * 0.05) = 54.75 -> 55, not the global 0.10 default's 5 * 20.9 = 104.5 -> 105
+        assertEquals(55, XpScalingService.calculateXp(5, 200, merged.xpSettings()));
     }
 
     @Test
