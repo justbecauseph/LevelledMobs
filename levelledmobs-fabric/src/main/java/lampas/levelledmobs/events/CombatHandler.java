@@ -50,9 +50,11 @@ public class CombatHandler {
             }
         }
 
-        // 2. Check for explosions caused by levelled mobs (e.g. Creepers). A mob's blast has both a direct and a causing
-        // entity, which makes it player_explosion rather than explosion, so match the whole is_explosion tag.
-        if (source.is(DamageTypeTags.IS_EXPLOSION) && attacker instanceof LivingEntity livingAttacker) {
+        // 2. Check for a levelled mob's own blast (e.g. Creepers). The mob is both its direct and its causing entity,
+        // which makes it player_explosion rather than explosion, so match the whole is_explosion tag. TNT or an End
+        // Crystal the mob sets off is not multiplied; a ghast fireball's blast is a projectile's and is handled above.
+        if (source.is(DamageTypeTags.IS_EXPLOSION) && directEntity == attacker
+            && attacker instanceof LivingEntity livingAttacker) {
             if (livingAttacker instanceof LevelledMobHolder holder) {
                 LevelledMobData data = holder.lampas$getLevelData();
                 if (data != null && data.level() > 1) {

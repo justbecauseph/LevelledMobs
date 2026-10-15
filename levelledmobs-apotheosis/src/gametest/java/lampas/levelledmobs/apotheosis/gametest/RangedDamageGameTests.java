@@ -36,7 +36,7 @@ import java.util.Map;
 /**
  * Live coverage for LevelledMobs' projectile and explosion multipliers, +5% per level above 1. Player overrides
  * actuallyHurt without calling super, so players need their own coverage, and a mob victim must take each multiplier
- * once.
+ * once. Only the mob's own blast is multiplied, not TNT it sets off, and melee hits are left alone.
  */
 public final class RangedDamageGameTests {
     private static final String RULE_ID = "gametest-ranged-damage";
@@ -53,9 +53,14 @@ public final class RangedDamageGameTests {
         Skeleton skeleton = levelledAttacker(helper, EntityTypes.SKELETON, new BlockPos(4, 2, 1));
         Creeper creeper = levelledAttacker(helper, EntityTypes.CREEPER, new BlockPos(4, 2, 4));
 
-        DamageSource arrow = level.damageSources().arrow(createAt(helper, EntityTypes.ARROW, new BlockPos(4, 3, 1)), skeleton);
+        DamageSource arrow = level.damageSources().arrow(
+            createAt(helper, EntityTypes.ARROW, new BlockPos(4, 3, 1)), skeleton);
         // The source vanilla gives a creeper's blast: it is both the direct and the causing entity.
         DamageSource blast = level.damageSources().explosion(creeper, creeper);
+        // TNT the creeper set off, and a melee hit, which grows through attack_damage instead.
+        DamageSource chainedTnt = level.damageSources().explosion(
+            createAt(helper, EntityTypes.TNT, new BlockPos(4, 2, 6)), creeper);
+        DamageSource melee = level.damageSources().mobAttack(skeleton);
 
         // Normal difficulty leaves mob damage to players as is.
         Difficulty previousDifficulty = level.getDifficulty();
@@ -65,6 +70,10 @@ public final class RangedDamageGameTests {
                 "a levelled skeleton's arrow hitting a player");
             assertDamageTaken(helper, victimPlayer(helper), blast, EXPLOSION_DAMAGE, EXPLOSION_DAMAGE * MULTIPLIER,
                 "a levelled creeper's explosion hitting a player");
+            assertDamageTaken(helper, victimPlayer(helper), chainedTnt, EXPLOSION_DAMAGE, EXPLOSION_DAMAGE,
+                "TNT a levelled creeper set off hitting a player");
+            assertDamageTaken(helper, victimPlayer(helper), melee, ARROW_DAMAGE, ARROW_DAMAGE,
+                "a levelled skeleton's melee hit on a player");
         } finally {
             level.getServer().setDifficulty(previousDifficulty, true);
         }
@@ -98,7 +107,8 @@ public final class RangedDamageGameTests {
         }
 
         String name = "the test " + type.getDescription().getString();
-        helper.assertTrue(mob instanceof LevelledMobHolder, "the LevelledMobs data-holder mixin was not applied to " + name);
+        helper.assertTrue(mob instanceof LevelledMobHolder,
+            "the LevelledMobs data-holder mixin was not applied to " + name);
         LevelledMobData data = ((LevelledMobHolder) mob).lampas$getLevelData();
         helper.assertTrue(data != null && data.levelled(), name + " was not levelled");
         helper.assertValueEqual(data.level(), LEVEL, "the LevelledMobs level of " + name);
