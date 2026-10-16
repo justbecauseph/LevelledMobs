@@ -108,6 +108,18 @@ public final class RangedDamageGameTests {
     }
 
     @GameTest(maxTicks = 20)
+    public void ruleProjectileDamageOverridesTheSettingsDefault(GameTestHelper helper) {
+        withRules(helper, List.of(levelRule(LEVEL, Map.of("projectile_damage", 0.02))), () -> {
+            Skeleton skeleton = levelledAttacker(helper, EntityTypes.SKELETON, new BlockPos(4, 2, 1), LEVEL);
+            Creeper creeper = levelledAttacker(helper, EntityTypes.CREEPER, new BlockPos(4, 2, 4), LEVEL);
+            // 1 + 0.02 x 20 = 1.4 from the rule, not the 0.05 default's 2.0; the rule sets no explosion fraction,
+            // so the blast keeps the settings default, 1 + 0.01 x 20 = 1.2.
+            assertRangedDamage(helper, skeleton, creeper, 1.4, DEFAULT_BLAST_MULTIPLIER);
+        });
+        helper.succeed();
+    }
+
+    @GameTest(maxTicks = 20)
     public void explosionDamageSurvivesAnNbtReloadAndDefaultsForLegacySaves(GameTestHelper helper) {
         withRules(helper, List.of(levelRule(HIGH_LEVEL, Map.of("explosion_damage", 0.0))), () -> {
             Creeper creeper = levelledAttacker(helper, EntityTypes.CREEPER, new BlockPos(4, 2, 4), HIGH_LEVEL);
