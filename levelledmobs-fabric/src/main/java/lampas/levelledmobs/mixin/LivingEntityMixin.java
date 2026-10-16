@@ -44,6 +44,13 @@ public abstract class LivingEntityMixin implements LevelledMobHolder {
             if (this.lampas$levelData.groupFactor() != LevelledMobData.NO_GROUP_FACTOR) {
                 output.putDouble("lampas:group_factor", this.lampas$levelData.groupFactor());
             }
+            // A missing key is no override, so the mob follows the settings default.
+            if (!Double.isNaN(this.lampas$levelData.projectileDamagePerLevel())) {
+                output.putDouble("lampas:projectile_damage", this.lampas$levelData.projectileDamagePerLevel());
+            }
+            if (!Double.isNaN(this.lampas$levelData.explosionDamagePerLevel())) {
+                output.putDouble("lampas:explosion_damage", this.lampas$levelData.explosionDamagePerLevel());
+            }
             if (this.lampas$levelData.hasPersistedModifiers()) {
                 output.putInt("lampas:retention_version", this.lampas$levelData.retentionVersion());
                 var modifiers = output.childrenList("lampas:effective_modifiers");
@@ -82,8 +89,10 @@ public abstract class LivingEntityMixin implements LevelledMobHolder {
                 ));
             }
             double groupFactor = input.getDoubleOr("lampas:group_factor", LevelledMobData.NO_GROUP_FACTOR);
+            double projectileDamage = input.getDoubleOr("lampas:projectile_damage", LevelledMobData.NO_DAMAGE_OVERRIDE);
+            double explosionDamage = input.getDoubleOr("lampas:explosion_damage", LevelledMobData.NO_DAMAGE_OVERRIDE);
             this.lampas$levelData = new LevelledMobData(level, levelled, rule, generatedAt, retentionVersion, modifiers,
-                quarantined, groupFactor);
+                quarantined, groupFactor, projectileDamage, explosionDamage);
         }
     }
 }

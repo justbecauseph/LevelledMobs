@@ -15,7 +15,9 @@ public record LevelledMobData(
     int retentionVersion,
     List<LevelledMobModifier> effectiveModifiers,
     boolean quarantined,
-    double groupFactor
+    double groupFactor,
+    double projectileDamagePerLevel,
+    double explosionDamagePerLevel
 ) {
     /** Version of the effective modifier representation written to entity data. */
     public static final int CURRENT_RETENTION_VERSION = 1;
@@ -25,6 +27,12 @@ public record LevelledMobData(
 
     /** Group factor of a mob that is not a multi-party boss: its max health is not multiplied. */
     public static final double NO_GROUP_FACTOR = 1.0;
+
+    /**
+     * Per-level damage fraction for a levelled mob that stores none: its projectile and explosion damage then follow
+     * the global settings default. Legacy data and rules without the attribute carry this value.
+     */
+    public static final double NO_DAMAGE_OVERRIDE = Double.NaN;
 
     public static final LevelledMobData EMPTY = new LevelledMobData(0, false, "none", 0L, 0, List.of(), false);
 
@@ -37,6 +45,13 @@ public record LevelledMobData(
         effectiveModifiers = Collections.unmodifiableList(bounded);
         // Malformed external data must never shrink or blow up a mob's health.
         groupFactor = (Double.isFinite(groupFactor) && groupFactor >= NO_GROUP_FACTOR) ? groupFactor : NO_GROUP_FACTOR;
+        projectileDamagePerLevel = sanitizeDamagePerLevel(projectileDamagePerLevel);
+        explosionDamagePerLevel = sanitizeDamagePerLevel(explosionDamagePerLevel);
+    }
+
+    /** Keeps a finite, non-negative fraction. Anything else, including NaN, means no override. */
+    private static double sanitizeDamagePerLevel(double fraction) {
+        return (Double.isFinite(fraction) && fraction >= 0.0) ? fraction : NO_DAMAGE_OVERRIDE;
     }
 
     /** Backward-compatible constructor for callers that only have legacy metadata. */
@@ -69,6 +84,21 @@ public record LevelledMobData(
         this(level, levelled, ruleSet, generatedAt, retentionVersion, effectiveModifiers, quarantined, NO_GROUP_FACTOR);
     }
 
+    /** Backward-compatible constructor for callers that predate the projectile and explosion damage overrides. */
+    public LevelledMobData(
+        int level,
+        boolean levelled,
+        String ruleSet,
+        long generatedAt,
+        int retentionVersion,
+        List<LevelledMobModifier> effectiveModifiers,
+        boolean quarantined,
+        double groupFactor
+    ) {
+        this(level, levelled, ruleSet, generatedAt, retentionVersion, effectiveModifiers, quarantined, groupFactor,
+            NO_DAMAGE_OVERRIDE, NO_DAMAGE_OVERRIDE);
+    }
+
     public static LevelledMobData of(int level, String ruleSet) {
         // The effective plan is attached by MobLevelingService after the rule is resolved.
         return new LevelledMobData(level, true, ruleSet, System.currentTimeMillis(), 0, List.of(), false);
@@ -83,7 +113,9 @@ public record LevelledMobData(
             CURRENT_RETENTION_VERSION,
             modifiers,
             quarantined,
-            groupFactor
+            groupFactor,
+            projectileDamagePerLevel,
+            explosionDamagePerLevel
         );
     }
 
@@ -100,7 +132,9 @@ public record LevelledMobData(
             CURRENT_RETENTION_VERSION,
             modifiers,
             quarantined,
-            groupFactor
+            groupFactor,
+            projectileDamagePerLevel,
+            explosionDamagePerLevel
         );
     }
 
@@ -113,7 +147,9 @@ public record LevelledMobData(
             retentionVersion,
             effectiveModifiers,
             quarantined,
-            groupFactor
+            groupFactor,
+            projectileDamagePerLevel,
+            explosionDamagePerLevel
         );
     }
 
@@ -130,7 +166,29 @@ public record LevelledMobData(
             retentionVersion,
             effectiveModifiers,
             quarantined,
-            factor
+            factor,
+            projectileDamagePerLevel,
+            explosionDamagePerLevel
+        );
+    }
+
+    /**
+     * Sets the per-level fractions that the mob's projectiles and its own blast add to its damage. They are fixed when
+     * the mob is levelled, relevelled or admin-set, from the rule that matches it. NaN means no override, so the mob
+     * uses the global settings default. A negative or infinite fraction is treated as NaN.
+     */
+    public LevelledMobData withDamagePerLevel(double projectile, double explosion) {
+        return new LevelledMobData(
+            level,
+            levelled,
+            ruleSet,
+            generatedAt,
+            retentionVersion,
+            effectiveModifiers,
+            quarantined,
+            groupFactor,
+            projectile,
+            explosion
         );
     }
 

@@ -120,4 +120,43 @@ public class LevelledMobDataTest {
         assertEquals(0, legacy.retentionVersion());
         assertTrue(legacy.effectiveModifiers().isEmpty());
     }
+
+    @Test
+    public void damagePerLevelDefaultsToNoOverrideAndSurvivesEveryCopy() {
+        assertTrue(Double.isNaN(LevelledMobData.EMPTY.projectileDamagePerLevel()));
+        assertTrue(Double.isNaN(LevelledMobData.of(5, "rule").explosionDamagePerLevel()));
+
+        // Zero is a real override that turns the damage off, so it must not read as "no override".
+        LevelledMobData set = LevelledMobData.of(20, "rule").withDamagePerLevel(0.05, 0.0);
+        assertEquals(0.05, set.projectileDamagePerLevel());
+        assertEquals(0.0, set.explosionDamagePerLevel());
+
+        List<LevelledMobModifier> plan = List.of(new LevelledMobModifier("max_health", "lampas:levelled/max_health", 1.0, "add_value"));
+        assertEquals(0.05, set.withEffectiveModifiers(plan).projectileDamagePerLevel());
+        assertEquals(0.0, set.withRelevel(30, plan).explosionDamagePerLevel());
+        assertEquals(0.05, set.withQuarantined(true).projectileDamagePerLevel());
+        assertEquals(0.0, set.withGroupFactor(1.5).explosionDamagePerLevel());
+        assertEquals(1.5, set.withGroupFactor(1.5).groupFactor());
+    }
+
+    @Test
+    public void malformedDamagePerLevelFallsBackToNoOverride() {
+        LevelledMobData data = LevelledMobData.of(5, "rule").withDamagePerLevel(-0.01, Double.POSITIVE_INFINITY);
+        assertTrue(Double.isNaN(data.projectileDamagePerLevel()));
+        assertTrue(Double.isNaN(data.explosionDamagePerLevel()));
+
+        LevelledMobData nan = LevelledMobData.of(5, "rule").withDamagePerLevel(Double.NaN, 0.02);
+        assertTrue(Double.isNaN(nan.projectileDamagePerLevel()));
+        assertEquals(0.02, nan.explosionDamagePerLevel());
+    }
+
+    @Test
+    public void legacyDataWithoutDamageFieldsHasNoOverride() {
+        // Saved before the damage fields existed: the 8-argument constructor carries only the group factor.
+        LevelledMobData legacy = new LevelledMobData(200, true, "old_rule", 1L, 1, List.of(), false, 1.5);
+
+        assertTrue(Double.isNaN(legacy.projectileDamagePerLevel()));
+        assertTrue(Double.isNaN(legacy.explosionDamagePerLevel()));
+        assertEquals(1.5, legacy.groupFactor());
+    }
 }

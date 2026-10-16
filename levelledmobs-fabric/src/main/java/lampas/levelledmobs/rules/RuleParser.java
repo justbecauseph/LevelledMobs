@@ -77,6 +77,7 @@ public class RuleParser {
         // 5. Settings (attributes, drops, xp, nametag)
         if (map.containsKey("attributes") && map.get("attributes") instanceof Map<?, ?> attrs) {
             builder.attributeSettings((Map<String, Object>) attrs);
+            warnOnMalformedDamage(ruleId, (Map<String, Object>) attrs);
         }
         if (map.containsKey("drops") && map.get("drops") instanceof Map<?, ?> drops) {
             builder.dropSettings((Map<String, Object>) drops);
@@ -89,6 +90,16 @@ public class RuleParser {
         }
 
         return builder.build();
+    }
+
+    /** A malformed damage attribute is ignored, so the mob uses the global default. Say so once, at load. */
+    private static void warnOnMalformedDamage(String ruleId, Map<String, Object> attrs) {
+        for (String key : List.of(EffectiveRule.PROJECTILE_DAMAGE_KEY, EffectiveRule.EXPLOSION_DAMAGE_KEY)) {
+            if (attrs.containsKey(key) && Double.isNaN(EffectiveRule.damagePerLevel(attrs, key))) {
+                LOGGER.warn("Rule '{}' sets {} to {}, which is not a non-negative number; the settings default applies",
+                    ruleId, key, attrs.get(key));
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

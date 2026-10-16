@@ -2,10 +2,13 @@ package lampas.levelledmobs.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import lampas.levelledmobs.drops.DropScalingService;
 import lampas.levelledmobs.drops.XpScalingService;
+import lampas.levelledmobs.events.CombatHandler;
 import lampas.levelledmobs.level.BossClassifier;
 import lampas.levelledmobs.level.MobProcessingQueue;
 import lampas.levelledmobs.nametag.NametagService;
@@ -28,6 +31,8 @@ import java.util.*;
 public class ConfigLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger("LevelledMobs");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String PROJECTILE_DAMAGE_SETTING = "defaultProjectileDamageMultiplier";
+    private static final String EXPLOSION_DAMAGE_SETTING = "defaultExplosionDamageMultiplier";
 
     private final Path configDir;
     private LevelledMobsConfig currentConfig = LevelledMobsConfig.DEFAULT;
@@ -100,6 +105,8 @@ public class ConfigLoader {
             }
             XpScalingService.setMultiplierPerLevel(currentConfig.defaultXpMultiplier());
             DropScalingService.setItemDropMultiplierPerLevel(currentConfig.defaultDropMultiplier());
+            CombatHandler.setProjectileDamageMultiplier(currentConfig.defaultProjectileDamageMultiplier());
+            CombatHandler.setExplosionDamageMultiplier(currentConfig.defaultExplosionDamageMultiplier());
 
             // Load rules
             List<LevelRule> loadedRules = loadRules(rulesFile);
@@ -123,13 +130,44 @@ public class ConfigLoader {
 
     private void readSettings(File file) {
         try (FileReader reader = new FileReader(file)) {
-            LevelledMobsConfig loaded = GSON.fromJson(reader, LevelledMobsConfig.class);
+            JsonElement root = JsonParser.parseReader(reader);
+            if (root == null || root.isJsonNull()) {
+                return;
+            }
+            JsonObject settings = root.getAsJsonObject();
+            // Each damage multiplier falls back on its own; a bad value does not reset the other keys.
+            settings.add(PROJECTILE_DAMAGE_SETTING, damageSetting(settings, PROJECTILE_DAMAGE_SETTING,
+                LevelledMobsConfig.DEFAULT_PROJECTILE_DAMAGE_MULTIPLIER));
+            settings.add(EXPLOSION_DAMAGE_SETTING, damageSetting(settings, EXPLOSION_DAMAGE_SETTING,
+                LevelledMobsConfig.DEFAULT_EXPLOSION_DAMAGE_MULTIPLIER));
+            LevelledMobsConfig loaded = GSON.fromJson(settings, LevelledMobsConfig.class);
             if (loaded != null) {
                 this.currentConfig = loaded;
             }
         } catch (Exception e) {
             LOGGER.error("Failed to read settings.json, falling back to defaults", e);
         }
+    }
+
+    /**
+     * Reads a per-level damage multiplier from settings.json. A missing key gives the fallback silently. A value that
+     * is not a finite, non-negative number gives the fallback with a warning.
+     */
+    private static JsonPrimitive damageSetting(JsonObject settings, String key, double fallback) {
+        JsonElement element = settings.get(key);
+        if (element == null || element.isJsonNull()) {
+            return new JsonPrimitive(fallback);
+        }
+        try {
+            double value = element.getAsDouble();
+            if (Double.isFinite(value) && value >= 0.0) {
+                return new JsonPrimitive(value);
+            }
+        } catch (RuntimeException ignored) {
+            // Not a number. The warning below covers it.
+        }
+        LOGGER.warn("settings.json {} must be a non-negative number; using {}", key, fallback);
+        return new JsonPrimitive(fallback);
     }
 
     private void writeDefaultRules(File file) {

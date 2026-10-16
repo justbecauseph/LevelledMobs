@@ -2,6 +2,7 @@ package lampas.levelledmobs.rules;
 
 import lampas.levelledmobs.attributes.AttributeDefinition;
 import lampas.levelledmobs.attributes.CompiledAttributeModifier;
+import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.rules.strategy.PlayerLevellingStrategy;
 import lampas.levelledmobs.rules.strategy.RandomLevellingStrategy;
 import lampas.levelledmobs.rules.strategy.SpawnDistanceStrategy;
@@ -31,6 +32,15 @@ public record EffectiveRule(
     List<CompiledAttributeModifier> compiledAttributes,
     Object compiledStrategyConfig
 ) {
+    /**
+     * Rule attribute: the fraction per level above 1 that a levelled mob's projectiles add to their damage. It is not
+     * an entity attribute, so {@link #compileAttributes} ignores it.
+     */
+    public static final String PROJECTILE_DAMAGE_KEY = "projectile_damage";
+
+    /** Rule attribute: the fraction per level above 1 that a levelled mob's own blast adds to its explosion damage. */
+    public static final String EXPLOSION_DAMAGE_KEY = "explosion_damage";
+
     public EffectiveRule(
         String primaryRuleId,
         List<String> matchedRuleIds,
@@ -110,6 +120,35 @@ public record EffectiveRule(
             Collections.unmodifiableMap(mergedXp),
             Collections.unmodifiableMap(mergedNametag)
         );
+    }
+
+    /** The projectile damage fraction per level this rule sets, or NaN when it sets no valid one. */
+    public double projectileDamagePerLevel() {
+        return damagePerLevel(attributeSettings, PROJECTILE_DAMAGE_KEY);
+    }
+
+    /** The explosion damage fraction per level this rule sets, or NaN when it sets no valid one. */
+    public double explosionDamagePerLevel() {
+        return damagePerLevel(attributeSettings, EXPLOSION_DAMAGE_KEY);
+    }
+
+    /**
+     * Reads a per-level damage fraction from rule attributes. A missing, non-numeric, negative or infinite value gives
+     * NaN, which means no override. Zero is a valid fraction and turns that damage off.
+     */
+    public static double damagePerLevel(Map<String, Object> attributes, String key) {
+        Object value = attributes == null ? null : attributes.get(key);
+        double parsed = Double.NaN;
+        if (value instanceof Number num) {
+            parsed = num.doubleValue();
+        } else if (value != null) {
+            try {
+                parsed = Double.parseDouble(String.valueOf(value).trim());
+            } catch (NumberFormatException ignored) {
+                parsed = Double.NaN;
+            }
+        }
+        return (Double.isFinite(parsed) && parsed >= 0.0) ? parsed : LevelledMobData.NO_DAMAGE_OVERRIDE;
     }
 
     public static List<CompiledAttributeModifier> compileAttributes(Map<String, Object> attributeSettings) {

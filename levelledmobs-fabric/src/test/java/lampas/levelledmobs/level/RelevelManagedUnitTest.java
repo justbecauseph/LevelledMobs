@@ -98,7 +98,9 @@ public class RelevelManagedUnitTest {
                 .attributeSettings(Map.of(
                     "max_health", 2.5,
                     "attack_damage", 0.25,
-                    "movement_speed", 0.001
+                    "movement_speed", 0.001,
+                    "projectile_damage", 0.03,
+                    "explosion_damage", 0.02
                 ))
                 .build();
             RuleManager ruleManager = new RuleManager();
@@ -120,6 +122,59 @@ public class RelevelManagedUnitTest {
         AttributeInstance instance(LivingEntity mob, AttributeDefinition def) {
             return mob.getAttribute(def.attribute());
         }
+    }
+
+    @Test
+    public void freshLevelStoresTheRuleDamageFractions() {
+        Fixture fixture = new Fixture();
+        fixture.strategy.min = 1;
+        fixture.strategy.max = 100;
+        fixture.strategy.next = 7;
+        TestMobs.TestMonster mob = TestMobs.monster();
+
+        fixture.service.level(mob, SpawnReason.NATURAL);
+
+        LevelledMobData data = mob.lampas$getLevelData();
+        assertTrue(data.levelled(), "the managed rule must level the mob");
+        assertEquals(0.03, data.projectileDamagePerLevel());
+        assertEquals(0.02, data.explosionDamagePerLevel());
+    }
+
+    @Test
+    public void relevelStoresTheCurrentRuleDamageFractions() {
+        Fixture fixture = new Fixture();
+        fixture.strategy.min = 5;
+        fixture.strategy.max = 10;
+        fixture.strategy.next = 7;
+        TestMobs.TestMonster mob = fixture.levelled(2, RULE_SET, false);
+        assertTrue(Double.isNaN(mob.lampas$getLevelData().projectileDamagePerLevel()),
+            "a mob levelled before the damage fields existed stores no override");
+
+        assertTrue(fixture.service.relevelManaged(mob));
+
+        assertEquals(0.03, mob.lampas$getLevelData().projectileDamagePerLevel());
+        assertEquals(0.02, mob.lampas$getLevelData().explosionDamagePerLevel());
+    }
+
+    @Test
+    public void adminSetLevelStoresTheMatchingRuleDamageFractions() {
+        Fixture fixture = new Fixture();
+        TestMobs.TestMonster mob = TestMobs.monster();
+
+        fixture.service.setLevel(mob, 30, "custom");
+
+        assertEquals(0.03, mob.lampas$getLevelData().projectileDamagePerLevel());
+        assertEquals(0.02, mob.lampas$getLevelData().explosionDamagePerLevel());
+    }
+
+    @Test
+    public void adminSetLevelWithNoMatchingRuleStoresNoDamageOverride() {
+        TestMobs.TestMonster mob = TestMobs.monster();
+
+        countingService(new AtomicInteger()).setLevel(mob, 30, "manual");
+
+        assertTrue(Double.isNaN(mob.lampas$getLevelData().projectileDamagePerLevel()));
+        assertTrue(Double.isNaN(mob.lampas$getLevelData().explosionDamagePerLevel()));
     }
 
     private static double amount(LivingEntity mob, AttributeDefinition def) {

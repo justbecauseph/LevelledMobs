@@ -1,6 +1,7 @@
 package lampas.levelledmobs.events;
 
 import lampas.levelledmobs.LevelledMobsModule;
+import lampas.levelledmobs.config.LevelledMobsConfig;
 import lampas.levelledmobs.data.LevelledMobData;
 import lampas.levelledmobs.data.LevelledMobHolder;
 import lampas.levelledmobs.level.BossClassifier;
@@ -15,8 +16,10 @@ import net.minecraft.world.entity.projectile.Projectile;
  * Handles combat damage modifications for non-melee and projectile attacks from levelled mobs.
  */
 public class CombatHandler {
-    private static double projectileDamageMultiplier = 0.05; // +5% per level above 1
-    private static double explosionDamageMultiplier = 0.05; // +5% per level above 1
+    /** Global default for the projectile fraction per level, used by a mob whose rule sets none. Set from settings.json. */
+    private static double projectileDamageMultiplier = LevelledMobsConfig.DEFAULT_PROJECTILE_DAMAGE_MULTIPLIER;
+    /** Global default for the explosion fraction per level, used by a mob whose rule sets none. Set from settings.json. */
+    private static double explosionDamageMultiplier = LevelledMobsConfig.DEFAULT_EXPLOSION_DAMAGE_MULTIPLIER;
 
     /**
      * Calculates the adjusted damage amount based on the attacker's level and damage source type.
@@ -25,6 +28,9 @@ public class CombatHandler {
      * <p>Damage caused by a levelled boss, or by a projectile or cloud it owns, is multiplied by
      * 1 + 0.025 * (level - 1) instead, unless the amount was read from the boss's attack_damage (see
      * {@link BossScaling#isAttackDamageHit}). It replaces the projectile and explosion multipliers for that damage.</p>
+     *
+     * <p>Other projectile and explosion damage uses the fraction per level stored on the mob when it was levelled. A
+     * mob that stores none uses the global default from settings.json.</p>
      */
     public static float modifyDamage(LivingEntity victim, DamageSource source, float originalDamage) {
         if (originalDamage <= 0 || source == null) {
@@ -44,8 +50,7 @@ public class CombatHandler {
             if (livingAttacker instanceof LevelledMobHolder holder) {
                 LevelledMobData data = holder.lampas$getLevelData();
                 if (data != null && data.level() > 1) {
-                    float multiplier = 1.0f + (float) ((data.level() - 1) * projectileDamageMultiplier);
-                    return originalDamage * multiplier;
+                    return originalDamage * levelMultiplier(data.level(), projectileDamagePerLevel(data));
                 }
             }
         }
@@ -58,8 +63,7 @@ public class CombatHandler {
             if (livingAttacker instanceof LevelledMobHolder holder) {
                 LevelledMobData data = holder.lampas$getLevelData();
                 if (data != null && data.level() > 1) {
-                    float multiplier = 1.0f + (float) ((data.level() - 1) * explosionDamageMultiplier);
-                    return originalDamage * multiplier;
+                    return originalDamage * levelMultiplier(data.level(), explosionDamagePerLevel(data));
                 }
             }
         }
@@ -84,10 +88,31 @@ public class CombatHandler {
         return data.level();
     }
 
+    /** The projectile fraction per level for this mob: the value stored when it was levelled, or the global default. */
+    public static double projectileDamagePerLevel(LevelledMobData data) {
+        return orDefault(data.projectileDamagePerLevel(), projectileDamageMultiplier);
+    }
+
+    /** The explosion fraction per level for this mob: the value stored when it was levelled, or the global default. */
+    public static double explosionDamagePerLevel(LevelledMobData data) {
+        return orDefault(data.explosionDamagePerLevel(), explosionDamageMultiplier);
+    }
+
+    /** The damage multiplier of a levelled mob, 1 + perLevel x (level - 1). */
+    static float levelMultiplier(int level, double perLevel) {
+        return 1.0f + (float) ((level - 1) * perLevel);
+    }
+
+    private static double orDefault(double stored, double globalDefault) {
+        return Double.isNaN(stored) ? globalDefault : stored;
+    }
+
+    /** Sets the global default projectile fraction per level. Mobs whose rule sets none use it. */
     public static void setProjectileDamageMultiplier(double multiplier) {
         projectileDamageMultiplier = multiplier;
     }
 
+    /** Sets the global default explosion fraction per level. Mobs whose rule sets none use it. */
     public static void setExplosionDamageMultiplier(double multiplier) {
         explosionDamageMultiplier = multiplier;
     }

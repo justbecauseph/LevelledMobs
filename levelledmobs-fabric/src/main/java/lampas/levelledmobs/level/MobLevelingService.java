@@ -192,9 +192,9 @@ public class MobLevelingService {
             List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, rule);
             attributeService.applyModifiers(entity, effectiveModifiers, groupFactor, HealthPolicy.FRESH_SPAWN);
 
-            LevelledMobData newData = LevelledMobData.of(level, rule.primaryRuleId())
+            LevelledMobData newData = withRuleDamage(LevelledMobData.of(level, rule.primaryRuleId())
                 .withEffectiveModifiers(effectiveModifiers)
-                .withGroupFactor(groupFactor);
+                .withGroupFactor(groupFactor), rule);
             holder.lampas$setLevelData(newData);
             nametagService.updateNametag(entity, level, rule.primaryRuleId());
 
@@ -286,7 +286,7 @@ public class MobLevelingService {
 
         List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(newLevel, rule);
         attributeService.applyModifiers(entity, effectiveModifiers, data.groupFactor(), HealthPolicy.PRESERVE_RATIO);
-        holder.lampas$setLevelData(data.withRelevel(newLevel, effectiveModifiers));
+        holder.lampas$setLevelData(withRuleDamage(data.withRelevel(newLevel, effectiveModifiers), rule));
         nametagService.updateNametag(entity, newLevel, data.ruleSet());
 
         LOGGER.debug("Re-levelled {} (UUID: {}) from Lv. {} to Lv. {} via strategy '{}' in rule '{}'",
@@ -303,6 +303,17 @@ public class MobLevelingService {
         return bossClassifier.isBoss(entity)
             ? BossScaling.groupFactor(BossScaling.countNearbyPlayers(entity))
             : LevelledMobData.NO_GROUP_FACTOR;
+    }
+
+    /**
+     * Fixes the projectile and explosion fractions from the rule that matches the mob, so later hits read them
+     * without resolving the rule again. A mob that matches no rule gets no override and uses the settings default.
+     */
+    private static LevelledMobData withRuleDamage(LevelledMobData data, EffectiveRule rule) {
+        if (rule == null) {
+            return data.withDamagePerLevel(LevelledMobData.NO_DAMAGE_OVERRIDE, LevelledMobData.NO_DAMAGE_OVERRIDE);
+        }
+        return data.withDamagePerLevel(rule.projectileDamagePerLevel(), rule.explosionDamagePerLevel());
     }
 
     private static boolean isAdminSet(String ruleSet) {
@@ -332,9 +343,9 @@ public class MobLevelingService {
             List<LevelledMobModifier> effectiveModifiers = attributeService.resolveEffectiveModifierPlan(level, rule);
             attributeService.applyModifiers(entity, effectiveModifiers, groupFactor, HealthPolicy.PRESERVE_RATIO);
 
-            LevelledMobData newData = LevelledMobData.of(level, ruleSet != null ? ruleSet : "manual")
+            LevelledMobData newData = withRuleDamage(LevelledMobData.of(level, ruleSet != null ? ruleSet : "manual")
                 .withEffectiveModifiers(effectiveModifiers)
-                .withGroupFactor(groupFactor);
+                .withGroupFactor(groupFactor), rule);
             holder.lampas$setLevelData(newData);
             nametagService.updateNametag(entity, level);
         } else {

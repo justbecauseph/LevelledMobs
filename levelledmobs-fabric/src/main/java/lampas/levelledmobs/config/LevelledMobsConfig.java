@@ -13,9 +13,41 @@ public record LevelledMobsConfig(
     boolean allowBossLeveling,
     boolean debug,
     double defaultXpMultiplier,
-    double defaultDropMultiplier
+    double defaultDropMultiplier,
+    double defaultProjectileDamageMultiplier,
+    double defaultExplosionDamageMultiplier
 ) {
     public static final int DEFAULT_MAX_PROCESS_TIME_MS = 2;
+
+    /** Fraction per level above 1 that a levelled mob's projectiles add to their damage, unless its rule sets one. */
+    public static final double DEFAULT_PROJECTILE_DAMAGE_MULTIPLIER = 0.05;
+
+    /** Fraction per level above 1 that a levelled mob's own blast adds to its explosion damage, unless its rule sets one. */
+    public static final double DEFAULT_EXPLOSION_DAMAGE_MULTIPLIER = 0.01;
+
+    public LevelledMobsConfig(
+        int maxMobsPerTick,
+        int maxProcessTimeMs,
+        String nametagTemplate,
+        NametagVisibility nametagVisibility,
+        boolean allowBossLeveling,
+        boolean debug,
+        double defaultXpMultiplier,
+        double defaultDropMultiplier
+    ) {
+        this(
+            maxMobsPerTick,
+            maxProcessTimeMs,
+            nametagTemplate,
+            nametagVisibility,
+            allowBossLeveling,
+            debug,
+            defaultXpMultiplier,
+            defaultDropMultiplier,
+            DEFAULT_PROJECTILE_DAMAGE_MULTIPLIER,
+            DEFAULT_EXPLOSION_DAMAGE_MULTIPLIER
+        );
+    }
 
     public LevelledMobsConfig(
         int maxMobsPerTick,
@@ -46,7 +78,9 @@ public record LevelledMobsConfig(
         false,
         false,
         0.10,
-        0.05
+        0.05,
+        DEFAULT_PROJECTILE_DAMAGE_MULTIPLIER,
+        DEFAULT_EXPLOSION_DAMAGE_MULTIPLIER
     );
 
     public int effectiveMaxProcessTimeMs() {
